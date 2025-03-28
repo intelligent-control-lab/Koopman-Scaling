@@ -199,6 +199,10 @@ class KoopmanDatasetCollector():
         """
         data: Tensor of shape (steps, num_trajectories, data_dim)
         """
+
+        if env_name == "Polynomial" or env_name == "LogisticMap":
+            Ksteps = 1
+            
         data_path = f"../data/datasets/dataset_{env_name}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt"
         self.u_dim = None
         self.state_dim = None
