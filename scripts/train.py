@@ -67,7 +67,7 @@ def cov_loss(z):
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
           train_steps=20000, all_loss=0, encode_dim=16, layer_depth=5, cov_reg=0, gamma=0.99, seed=42, 
-          batch_size=64, initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000):
+          batch_size=64, initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight_init=1e-3):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -106,7 +106,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     mse_loss = nn.MSELoss()
 
     if cov_reg:
-        learned_cov_weight = LearnedCovWeight(init_val=1e-3).to(device).double()
+        learned_cov_weight = LearnedCovWeight(init_val=cov_reg_weight_init).to(device).double()
         optimizer = torch.optim.Adam(
             list(net.parameters()) + list(learned_cov_weight.parameters()),
             lr=initial_lr
@@ -138,6 +138,8 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                     "lr_step": lr_step,
                     "lr_gamma": lr_gamma,
                     "batch_size": batch_size,
+                    "max_norm": max_norm,
+                    "cov_reg_weight_init": cov_reg_weight_init,
                })
 
     best_loss = 1e10
@@ -170,7 +172,6 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             optimizer.zero_grad()
             loss.backward()
 
-            max_norm = 0.01
             torch.nn.utils.clip_grad_norm_(net.lA.parameters(), max_norm)
             if u_dim is not None:
                 torch.nn.utils.clip_grad_norm_(net.lB.parameters(), max_norm)
@@ -221,21 +222,33 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 def main():
     cov_regs = [0, 1]
     encode_dims = [1, 4, 16, 64, 256, 512, 1024]
-    #encode_dims = [512]
     random_seeds = [1]
-    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
-    #envs = ['Franka']
-    train_steps = {'G1': 25000, 'Go2': 25000, 'Franka': 100000, 'DoublePendulum': 50000, 'DampingPendulum': 50000, 'Polynomial': 100000, 'LogisticMap': 100000}
+    envs = ['G1', 'Go2', 'Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka']
+    #envs = ['G1']
 
     for env, encode_dim, cov_reg, random_seed in itertools.product(envs, encode_dims, cov_regs, random_seeds):
+        if env == "Polynomial" or env == "LogisticMap":
+            Ksteps = 1
+        else:
+            Ksteps = 15
+
+        if env in ["Polynomial", "Franka", "DoublePendulum", "DampingPendulum"]:
+            max_norm = 0.01
+            cov_reg_weight_init = 1e-3
+        elif env in ["LogisticMap"]:
+            max_norm = 0.001
+            cov_reg_weight_init = 1e-3
+        elif env in ["G1", "Go2"]:
+            max_norm = 0.001
+            cov_reg_weight_init = 5e-4
 
         train(project_name=f'Koopman_{env}',
               env_name=env,
               train_samples=60000,
               val_samples=20000,
               test_samples=20000,
-              Ksteps=15,
-              train_steps=train_steps[env],
+              Ksteps=Ksteps,
+              train_steps=100000,
               encode_dim=encode_dim,
               layer_depth=5,
               cov_reg=cov_reg,
@@ -244,7 +257,9 @@ def main():
               batch_size=64,
               initial_lr=1e-3,
               lr_step=100,
-              lr_gamma=0.99)
+              lr_gamma=0.99,
+              max_norm=max_norm,
+              cov_reg_weight_init=cov_reg_weight_init)
 
 if __name__ == "__main__":
     main()
