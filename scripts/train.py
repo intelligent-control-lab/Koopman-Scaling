@@ -219,16 +219,17 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     wandb.finish()
 
 def main():
-    cov_regs = [1]
-    encode_dims = [1024]#[1, 4, 16, 64, 256, 512, 1024]
+    cov_regs = [0, 1]
+    encode_dims = [1, 4, 16, 64, 256, 512, 1024]
+    #encode_dims = [512]
     random_seeds = [1]
-    # envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
-    envs = ['Franka']
-    train_steps = {'G1': 25000, 'Go2': 25000, 'Franka': 100000, 'DoublePendulum': 50000, 'DampingPendulum': 50000, 'Polynomial': 150000, 'LogisticMap': 100000}
+    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
+    #envs = ['Franka']
+    train_steps = {'G1': 25000, 'Go2': 25000, 'Franka': 100000, 'DoublePendulum': 50000, 'DampingPendulum': 50000, 'Polynomial': 100000, 'LogisticMap': 100000}
 
     for env, encode_dim, cov_reg, random_seed in itertools.product(envs, encode_dims, cov_regs, random_seeds):
 
-        train(project_name=f'{env}_run_1',
+        train(project_name=f'Koopman_{env}',
               env_name=env,
               train_samples=60000,
               val_samples=20000,
