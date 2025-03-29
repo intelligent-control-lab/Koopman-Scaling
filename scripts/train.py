@@ -156,13 +156,11 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                 break
             X = batch.permute(1, 0, 2).to(device)
 
-            # Inside the training loop
             Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device)
 
             Closs = cov_loss(initial_encoding)
 
             if cov_reg:
-                # factor = cov_reg_weight / (encode_dim ** 0.5)
                 factor = learned_cov_weight()
                 loss = Kloss + factor * Closs
             else:
@@ -223,8 +221,8 @@ def main():
     cov_regs = [0, 1]
     encode_dims = [1, 4, 16, 64, 256, 512, 1024]
     random_seeds = [1]
-    envs = ['G1', 'Go2', 'Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka']
-    #envs = ['G1']
+    envs = ['G1', 'Go2', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'Polynomial']
+    #envs = ['LogisticMap']
 
     for env, encode_dim, cov_reg, random_seed in itertools.product(envs, encode_dims, cov_regs, random_seeds):
         if env == "Polynomial" or env == "LogisticMap":
@@ -237,10 +235,13 @@ def main():
             cov_reg_weight_init = 1e-3
         elif env in ["LogisticMap"]:
             max_norm = 0.001
-            cov_reg_weight_init = 1e-3
-        elif env in ["G1", "Go2"]:
-            max_norm = 0.001
-            cov_reg_weight_init = 5e-4
+            cov_reg_weight_init = 1e-6
+        elif env in ["G1"]:
+            max_norm = 1
+            cov_reg_weight_init = 1e-7
+        elif env in ["Go2"]:
+            max_norm = 1
+            cov_reg_weight_init = 1e-6
 
         train(project_name=f'Koopman_{env}',
               env_name=env,
@@ -255,6 +256,7 @@ def main():
               gamma=0.8,
               seed=random_seed,
               batch_size=64,
+              val_step=1000,
               initial_lr=1e-3,
               lr_step=100,
               lr_gamma=0.99,
