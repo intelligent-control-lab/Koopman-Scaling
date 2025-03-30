@@ -1,6 +1,7 @@
 import pybullet as pb
 import pybullet_data
 import numpy as np
+import os
 
 class FrankaEnv(object):
 
@@ -14,7 +15,11 @@ class FrankaEnv(object):
         pb.setTimeStep(ts)
         pb.setAdditionalSearchPath(pybullet_data.getDataPath())
         planeID = pb.loadURDF('plane.urdf')
-        self.robot = pb.loadURDF('./franka_description/robots/franka_panda.urdf', [0.,0.,0.], useFixedBase=1)
+    
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        urdf_path = os.path.join(base_path, "franka_description/robots/franka_panda.urdf")
+
+        self.robot = pb.loadURDF(urdf_path, [0.,0.,0.], useFixedBase=1)
         pb.setGravity(0,0,-9.81)
         self.reset_joint_state = [0., -0.78, 0., -2.35, 0., 1.57, 0.78]
         self.ee_id = 7
