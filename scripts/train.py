@@ -8,7 +8,7 @@ import wandb
 from torch.utils.data import DataLoader
 import math
 from dataset import KoopmanDatasetCollector, KoopmanDataset
-from network import KoopmanNet, LearnedCovWeight
+from network import KoopmanNet
 
 def get_layers(input_dim, target_dim, layer_depth=5):
     if layer_depth < 2:
@@ -67,7 +67,7 @@ def cov_loss(z):
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
           train_steps=20000, all_loss=0, encode_dim=16, layer_depth=5, cov_reg=0, gamma=0.99, seed=42, 
-          batch_size=64, initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight_init=1e-3):
+          batch_size=64, initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight=1):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -105,14 +105,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     net.double()
     mse_loss = nn.MSELoss()
 
-    if cov_reg:
-        learned_cov_weight = LearnedCovWeight(init_val=cov_reg_weight_init).to(device).double()
-        optimizer = torch.optim.Adam(
-            list(net.parameters()) + list(learned_cov_weight.parameters()),
-            lr=initial_lr
-        )
-    else:
-        optimizer = torch.optim.Adam(net.parameters(), lr=initial_lr)
+    optimizer = torch.optim.Adam(net.parameters(), lr=initial_lr)
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
     
@@ -139,7 +132,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                     "lr_gamma": lr_gamma,
                     "batch_size": batch_size,
                     "max_norm": max_norm,
-                    "cov_reg_weight_init": cov_reg_weight_init,
+                    "cov_reg_weight": cov_reg_weight,
                })
 
     best_loss = 1e10
@@ -161,8 +154,8 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             Closs = cov_loss(initial_encoding)
 
             if cov_reg:
-                factor = learned_cov_weight()
-                loss = Kloss + factor * Closs
+                factor = initial_encoding.shape[1] * (initial_encoding.shape[1] - 1)
+                loss = Kloss + cov_reg_weight * Closs / factor
             else:
                 loss = Kloss
 
@@ -180,7 +173,6 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             wandb.log({
                 "Train/Kloss": Kloss.item(),
                 "Train/CovLoss": Closs.item(),
-                "Train/learned_cov_weight": factor.item() if cov_reg else 0,
                 "step": step
             })
 
@@ -201,7 +193,6 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                         "Val/Kloss": Kloss_val.item(),
                         "Val/CovLoss": Closs_val.item(),
                         "Val/best_Kloss": best_loss.item(),
-                        "Val/learned_cov_weight": factor.item() if cov_reg else 0,
                         "step": step,
                     })
                     print("Step:{} Validation Kloss:{}".format(step, Kloss_val.item()))
@@ -222,7 +213,9 @@ def main():
     encode_dims = [1, 4, 16, 64, 256, 512, 1024]
     random_seeds = [1]
     envs = ['G1', 'Go2', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'Polynomial']
-    #envs = ['LogisticMap']
+    
+    train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 100000, 'DoublePendulum': 50000, 
+                   'DampingPendulum': 50000, 'Polynomial': 100000, 'LogisticMap': 100000}
 
     for env, encode_dim, cov_reg, random_seed in itertools.product(envs, encode_dims, cov_regs, random_seeds):
         if env == "Polynomial" or env == "LogisticMap":
@@ -232,36 +225,30 @@ def main():
 
         if env in ["Polynomial", "Franka", "DoublePendulum", "DampingPendulum"]:
             max_norm = 0.01
-            cov_reg_weight_init = 1e-3
         elif env in ["LogisticMap"]:
             max_norm = 0.001
-            cov_reg_weight_init = 1e-6
-        elif env in ["G1"]:
+        elif env in ["G1", "Go2"]:
             max_norm = 1
-            cov_reg_weight_init = 1e-7
-        elif env in ["Go2"]:
-            max_norm = 1
-            cov_reg_weight_init = 1e-6
 
-        train(project_name=f'Koopman_{env}',
+        train(project_name=f'Koopman_Results',
               env_name=env,
               train_samples=60000,
               val_samples=20000,
               test_samples=20000,
               Ksteps=Ksteps,
-              train_steps=100000,
+              train_steps=train_steps[env],
               encode_dim=encode_dim,
-              layer_depth=5,
+              layer_depth=3,
               cov_reg=cov_reg,
               gamma=0.8,
               seed=random_seed,
-              batch_size=64,
+              batch_size=256,
               val_step=1000,
               initial_lr=1e-3,
               lr_step=100,
               lr_gamma=0.99,
               max_norm=max_norm,
-              cov_reg_weight_init=cov_reg_weight_init)
+              cov_reg_weight=1)
 
 if __name__ == "__main__":
     main()

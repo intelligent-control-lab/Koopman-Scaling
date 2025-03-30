@@ -133,30 +133,53 @@ class FrankaDataCollecter():
         return train_data
     
 class G1Go2DataCollecter():
-    def __init__(self, env_name, normalize=True):
+    def __init__(self, env_name, use_initial_data=False, normalize=True):
         self.normalize = normalize
 
-        go2_tracking_path_0 = '2025-03-24-20-45-16_trajnum30000_trajlen15'
-        go2_tracking_path_1 = '2025-03-24-21-14-03_trajnum30000_trajlen15'
-        go2_tracking_path_2 = '2025-03-24-21-57-32_trajnum30000_trajlen15'
-        g1_tracking_path_0 = '2025-03-23-23-31-06_trajnum30000_trajlen15'
-        g1_tracking_path_1 = '2025-03-23-23-59-32_trajnum30000_trajlen15'
-        g1_tracking_path_2 = '2025-03-24-00-43-16_trajnum30000_trajlen15'
+        if use_initial_data:
+            g1_initial_path = 'None_trajnum90000_trajlen100'
+            go2_initial_path = 'None_trajnum89947_trajlen100'
 
-        try:
-            if env_name == 'Go2':
-                tracking_dataset_path_0 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_0}.npz"
-                tracking_dataset_path_1 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_1}.npz"
-                tracking_dataset_path_2 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_2}.npz"
+            try:
+                if env_name == 'Go2':
+                    initial_dataset_path = f"../data/datasets/unitree_go2_flat/initial_dataset/{go2_initial_path}.npz"
+                elif env_name == 'G1':
+                    initial_dataset_path = f"../data/datasets/g1_flat/initial_dataset/{g1_initial_path}.npz"
+            except:
+                raise ValueError("Dataset not found for the given environment.")
+            self.data_pathes = [initial_dataset_path]
 
-            elif env_name == 'G1':
-                tracking_dataset_path_0 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_0}.npz"
-                tracking_dataset_path_1 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_1}.npz"
-                tracking_dataset_path_2 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_2}.npz"
-        except:
-            raise ValueError("Dataset not found for the given environment.")
-        
-        self.data_pathes = [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2]
+        else:
+            go2_tracking_path_0 = '2025-03-24-20-45-16_trajnum30000_trajlen15'
+            go2_tracking_path_1 = '2025-03-24-21-14-03_trajnum30000_trajlen15'
+            go2_tracking_path_2 = '2025-03-24-21-57-32_trajnum30000_trajlen15'
+            go2_tracking_path_3 = '2025-03-24-22-46-11_trajnum30000_trajlen15'
+
+            g1_tracking_path_0 = '2025-03-23-23-31-06_trajnum30000_trajlen15'
+            g1_tracking_path_1 = '2025-03-23-23-59-32_trajnum30000_trajlen15'
+            g1_tracking_path_2 = '2025-03-24-00-43-16_trajnum30000_trajlen15'
+            g1_tracking_path_3 = '2025-03-24-01-32-42_trajnum30000_trajlen15'
+            g1_tracking_path_4 = '2025-03-24-02-38-25_trajnum30000_trajlen15'
+            g1_tracking_path_5 = '2025-03-24-04-01-44_trajnum30000_trajlen15'
+
+            try:
+                if env_name == 'Go2':
+                    tracking_dataset_path_0 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_0}.npz"
+                    tracking_dataset_path_1 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_1}.npz"
+                    tracking_dataset_path_2 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_2}.npz"
+                    tracking_dataset_path_3 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_3}.npz"
+                    self.data_pathes = [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3]
+
+                elif env_name == 'G1':
+                    tracking_dataset_path_0 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_0}.npz"
+                    tracking_dataset_path_1 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_1}.npz"
+                    tracking_dataset_path_2 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_2}.npz"
+                    tracking_dataset_path_3 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_3}.npz"
+                    tracking_dataset_path_4 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_4}.npz"
+                    tracking_dataset_path_5 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_5}.npz"
+                    self.data_pathes = [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3, tracking_dataset_path_4, tracking_dataset_path_5]
+            except:
+                raise ValueError("Dataset not found for the given environment.")
     
     def get_data(self, data_paths, steps=15, normalize=True):
         state_data = []
@@ -222,16 +245,16 @@ class KoopmanDatasetCollector():
             self.state_dim = collector.Nstates
             self.u_dim = collector.udim
         elif env_name == "G1":
-            collector = G1Go2DataCollecter(env_name, normalize=True)
+            collector = G1Go2DataCollecter(env_name, use_initial_data=True, normalize=True)
             self.state_dim = 87
             self.u_dim = 37
         elif env_name == "Go2":
-            collector = G1Go2DataCollecter(env_name, normalize=True)
+            collector = G1Go2DataCollecter(env_name, use_initial_data=True, normalize=True)
             self.state_dim = 37
             self.u_dim = 12
         else:
             raise ValueError("Unknown environment name.")
-            
+
         if not os.path.exists(data_path):
             data = collector.collect_koopman_data(train_samples+val_samples+test_samples, Ksteps)
             permutation = np.random.permutation(data.shape[1])
@@ -241,7 +264,7 @@ class KoopmanDatasetCollector():
             test_data = shuffled[:, 70000:90000, :]
 
             torch.save({"Ktrain_data": train_data, "Kval_data": val_data, "Ktest_data": test_data}, data_path)
-
+            
         dataset = torch.load(data_path, weights_only=False)
         self.train_data = dataset['Ktrain_data']
         self.val_data = dataset['Kval_data']
