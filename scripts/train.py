@@ -66,8 +66,8 @@ def cov_loss(z):
     return torch.norm(off_diag, p='fro')**2
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
-          train_steps=20000, all_loss=0, encode_dim=16, layer_depth=5, cov_reg=0, gamma=0.99, seed=42, 
-          batch_size=64, initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight=1):
+          train_steps=20000, encode_dim=16, layer_depth=5, cov_reg=0, gamma=0.99, seed=42, batch_size=64, 
+          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight=1, normalize=False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -77,9 +77,11 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
+    norm_str = "norm" if normalize else "nonorm"
 
     print("Loading dataset...")
-    data_collector = KoopmanDatasetCollector(env_name, train_samples, val_samples, test_samples, Ksteps, device)
+
+    data_collector = KoopmanDatasetCollector(env_name, train_samples, val_samples, test_samples, Ksteps, device, normalize=normalize)
     Ktrain_data, Kval_data, Ktest_data = data_collector.get_data()
 
     Ktrain_data = torch.from_numpy(Ktrain_data).double()
@@ -117,7 +119,6 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                config={
                     "env_name": env_name,
                     "train_steps": train_steps,
-                    "all_loss": all_loss,
                     "encode_dim": encode_dim,
                     "layer_depth": layer_depth,
                     "c_loss": cov_reg,
@@ -140,7 +141,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     val_losses = []
 
     train_dataset = KoopmanDataset(Ktrain_data)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
     Kval_data = Kval_data.to(device)
 
     while step < train_steps:
@@ -187,7 +188,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                         best_loss = copy.copy(Kloss_val)
                         best_state_dict = copy.copy(net.state_dict())
                         saved_dict = {'model':best_state_dict,'layer':layers}
-                        torch.save(saved_dict, f"../log/best_models/best_model_{env_name}_{encode_dim}_{cov_reg}_{seed}.pth")
+                        torch.save(saved_dict, f"../log/best_models/best_model_{norm_str}_{env_name}_{encode_dim}_{cov_reg}_{seed}.pth")
 
                     wandb.log({
                         "Val/Kloss": Kloss_val.item(),
@@ -211,26 +212,29 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 def main():
     cov_regs = [0, 1]
     encode_dims = [1, 4, 16, 64, 256, 512, 1024]
-    random_seeds = [1]
-    envs = ['G1', 'Go2', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'Polynomial']
-    
-    train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 100000, 'DoublePendulum': 50000, 
-                   'DampingPendulum': 50000, 'Polynomial': 100000, 'LogisticMap': 100000}
+    random_seeds = [1, 2, 3]
+    envs = ['LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'Polynomial', 'G1', 'Go2']
+    #envs = ['LogisticMap']
+    train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 100000, 'DoublePendulum': 100000, 
+                   'DampingPendulum': 100000, 'Polynomial': 100000, 'LogisticMap': 100000}
 
-    for env, encode_dim, cov_reg, random_seed in itertools.product(envs, encode_dims, cov_regs, random_seeds):
+    for random_seed, env, encode_dim, cov_reg in itertools.product(random_seeds, envs, encode_dims, cov_regs):
         if env == "Polynomial" or env == "LogisticMap":
             Ksteps = 1
         else:
             Ksteps = 15
 
-        if env in ["Polynomial", "Franka", "DoublePendulum", "DampingPendulum"]:
-            max_norm = 0.01
-        elif env in ["LogisticMap"]:
-            max_norm = 0.001
-        elif env in ["G1", "Go2"]:
-            max_norm = 1
+        if env == "G1" or env == "Go2":
+            layer_depth = 3
+        else:
+            layer_depth = 5
 
-        train(project_name=f'Koopman_Results',
+        if env == "Franka" or env == "LogisticMap":
+            normalize = False
+        else:
+            normalize = True
+
+        train(project_name=f'Koopman_Results_Mar_31_2',
               env_name=env,
               train_samples=60000,
               val_samples=20000,
@@ -238,17 +242,19 @@ def main():
               Ksteps=Ksteps,
               train_steps=train_steps[env],
               encode_dim=encode_dim,
-              layer_depth=3,
+              layer_depth=layer_depth,
               cov_reg=cov_reg,
               gamma=0.8,
               seed=random_seed,
-              batch_size=256,
+              batch_size=64,
               val_step=1000,
               initial_lr=1e-3,
               lr_step=100,
               lr_gamma=0.99,
-              max_norm=max_norm,
-              cov_reg_weight=1)
+              max_norm=0.01,
+              cov_reg_weight=1,
+              normalize=normalize,
+              )
 
 if __name__ == "__main__":
     main()

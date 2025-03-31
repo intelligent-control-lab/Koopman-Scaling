@@ -18,7 +18,6 @@ class PolynomialDataCollector:
         self.a1 = a1 if a1 is not None else np.random.uniform(-2, 2)
         self.a2 = a2 if a2 is not None else np.random.uniform(-2, 2)
         self.a3 = a3 if a3 is not None else np.random.uniform(-2, 2)
-        # b: polynomial coefficients for p=1,..., m-2
         if b is None:
             self.b = np.random.uniform(-2, 2, size=(m-2,))
         else:
@@ -34,7 +33,6 @@ class PolynomialDataCollector:
           x1_next = a1 * x1
           x2_next = a2 * x2
           x3_next = a3 * x3 + sum_{p=1}^{m-2} b_p * (x1)^p
-        x is a numpy array of shape (batch, 3)
         """
         x1 = x[:, 0]
         x2 = x[:, 1]
@@ -49,9 +47,6 @@ class PolynomialDataCollector:
         return x_next
 
     def collect_koopman_data(self, traj_num, steps):
-        """
-        Collect trajectories for Koopman training.
-        """
         data = np.empty((steps + 1, traj_num, self.state_dim))
         for traj_i in range(traj_num):
             x0 = self.random_state()
@@ -62,13 +57,10 @@ class PolynomialDataCollector:
                 data[i, traj_i, :] = next_state
                 current_state = next_state
         return data
-    
+
 class LogisticMapDataCollector:
     """
     A data collection module for the infinite-dimensional (logistic map) dynamics.
-    Dynamics:
-       x_next = lambda_param * x * (1 - x)
-    where x is a numpy array of shape (batch, 1) with values in [0, 1].
     """
     def __init__(self, state_dim=1, lambda_param=0.5):
         self.state_dim = state_dim
@@ -76,7 +68,6 @@ class LogisticMapDataCollector:
             self.lambda_param = lambda_param
         else:
             self.lambda_param = np.random.uniform(0, 2)
-        print("lambda:", self.lambda_param)
         
     def random_state(self):
         # Sample a random initial state uniformly from [0, 1]^state_dim
@@ -87,9 +78,6 @@ class LogisticMapDataCollector:
         return self.lambda_param * x * (1 - x)
     
     def collect_koopman_data(self, traj_num, steps):
-        """
-        Collect trajectories for Koopman training.
-        """
         data = np.empty((steps + 1, traj_num, self.state_dim))
         for traj_i in range(traj_num):
             x0 = self.random_state()
@@ -100,18 +88,19 @@ class LogisticMapDataCollector:
                 data[i, traj_i, :] = next_state
                 current_state = next_state
         return data
-    
+
 def Obs(o):
     # Use only selected components of the observation
     return np.concatenate((o[:3], o[7:]), axis=0)
 
 class FrankaDataCollecter():
-    def __init__(self):
+    def __init__(self, normalize=True):
         self.env = FrankaEnv(render=False)
         self.Nstates = 17
         self.uval = 0.12
         self.udim = 7
         self.reset_joint_state = np.array(self.env.reset_joint_state)
+        self.normalize = normalize
 
     def collect_koopman_data(self, traj_num, steps):
         train_data = np.empty((steps+1, traj_num, self.Nstates + self.udim))
@@ -122,24 +111,23 @@ class FrankaDataCollecter():
             s0 = self.env.reset_state(joint_init)
             s0 = Obs(s0)
             u10 = (np.random.rand(7) - 0.5) * 2 * self.uval
-            train_data[0, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0).reshape(-1)
+            train_data[0, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0)
             if traj_i % 1000 == 0:
                 print("Trajectory:", traj_i)
             for i in range(1, steps+1):
                 s0 = self.env.step(u10)
                 s0 = Obs(s0)
                 u10 = (np.random.rand(7) - 0.5) * 2 * self.uval
-                train_data[i, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0).reshape(-1)
+                train_data[i, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0)
         return train_data
-    
+
 class G1Go2DataCollecter():
     def __init__(self, env_name, use_initial_data=False, normalize=True):
+        # Note: normalization will now be handled uniformly later.
         self.normalize = normalize
-
         if use_initial_data:
             g1_initial_path = 'None_trajnum90000_trajlen100'
             go2_initial_path = 'None_trajnum89947_trajlen100'
-
             try:
                 if env_name == 'Go2':
                     initial_dataset_path = f"../data/datasets/unitree_go2_flat/initial_dataset/{go2_initial_path}.npz"
@@ -148,20 +136,17 @@ class G1Go2DataCollecter():
             except:
                 raise ValueError("Dataset not found for the given environment.")
             self.data_pathes = [initial_dataset_path]
-
         else:
             go2_tracking_path_0 = '2025-03-24-20-45-16_trajnum30000_trajlen15'
             go2_tracking_path_1 = '2025-03-24-21-14-03_trajnum30000_trajlen15'
             go2_tracking_path_2 = '2025-03-24-21-57-32_trajnum30000_trajlen15'
             go2_tracking_path_3 = '2025-03-24-22-46-11_trajnum30000_trajlen15'
-
             g1_tracking_path_0 = '2025-03-23-23-31-06_trajnum30000_trajlen15'
             g1_tracking_path_1 = '2025-03-23-23-59-32_trajnum30000_trajlen15'
             g1_tracking_path_2 = '2025-03-24-00-43-16_trajnum30000_trajlen15'
             g1_tracking_path_3 = '2025-03-24-01-32-42_trajnum30000_trajlen15'
             g1_tracking_path_4 = '2025-03-24-02-38-25_trajnum30000_trajlen15'
             g1_tracking_path_5 = '2025-03-24-04-01-44_trajnum30000_trajlen15'
-
             try:
                 if env_name == 'Go2':
                     tracking_dataset_path_0 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_0}.npz"
@@ -169,7 +154,6 @@ class G1Go2DataCollecter():
                     tracking_dataset_path_2 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_2}.npz"
                     tracking_dataset_path_3 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_3}.npz"
                     self.data_pathes = [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3]
-
                 elif env_name == 'G1':
                     tracking_dataset_path_0 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_0}.npz"
                     tracking_dataset_path_1 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_1}.npz"
@@ -190,43 +174,36 @@ class G1Go2DataCollecter():
             if state_data[-1].shape[0] != steps+1:
                 state_data[-1] = state_data[-1][:steps+1, :, :]
                 action_data[-1] = action_data[-1][:steps, :, :]
-            print(state_data[-1].shape)
-            print(action_data[-1].shape)
-
         state_data = np.concatenate(state_data, axis=1)
         action_data = np.concatenate(action_data, axis=1)
-
-        if normalize:
-            state_data_mean = np.mean(state_data, axis=(0, 1))
-            state_data_std = np.std(state_data, axis=(0, 1))
-            state_data = (state_data - state_data_mean) / state_data_std
-
+        # Removed normalization from here; it will be applied later uniformly.
         num_traj = state_data.shape[1]
         T = state_data.shape[0]
         state_dim = state_data.shape[2]
         action_dim = action_data.shape[2]
-
         combined_data = np.empty((T, num_traj, state_dim+action_dim), dtype=state_data.dtype)
         for t in range(T-1):
             combined_data[t, :, :] = np.concatenate([action_data[t], state_data[t]], axis=-1)
-
         combined_data[T-1, :, :] = np.concatenate([np.zeros((num_traj, action_dim), dtype=state_data.dtype), state_data[T-1]], axis=-1)
-
         return combined_data
-
+    
     def collect_koopman_data(self, traj_num, steps):
         return self.get_data(self.data_pathes, steps, normalize=self.normalize)[:, :traj_num, :]
-    
-class KoopmanDatasetCollector():
-    def __init__(self, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15, device="cuda"):
-        """
-        data: Tensor of shape (steps, num_trajectories, data_dim)
-        """
 
-        if env_name == "Polynomial" or env_name == "LogisticMap":
-            Ksteps = 1
-            
-        data_path = f"../data/datasets/dataset_{env_name}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt"
+class KoopmanDatasetCollector():
+    def __init__(self, env_name, train_samples=60000, val_samples=20000, test_samples=20000,
+                 Ksteps=15, device="cuda", normalize=True):
+        """
+        Collects the Koopman dataset.
+        The normalization hyperparameter controls whether the state data are normalized.
+        The saved data file name reflects the normalization setting.
+        """
+        self.normalize = normalize
+        
+        # Use a suffix in the file name to indicate normalization.
+        norm_str = "norm" if self.normalize else "nonorm"
+        data_path = f"../data/datasets/dataset_{env_name}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt"
+        
         self.u_dim = None
         self.state_dim = None
 
@@ -237,7 +214,7 @@ class KoopmanDatasetCollector():
             collector = LogisticMapDataCollector()
             self.state_dim = collector.state_dim
         elif env_name == "Franka":
-            collector = FrankaDataCollecter()
+            collector = FrankaDataCollecter(normalize=self.normalize)
             self.state_dim = collector.Nstates
             self.u_dim = collector.udim
         elif env_name == "DoublePendulum" or env_name == "DampingPendulum":
@@ -245,24 +222,36 @@ class KoopmanDatasetCollector():
             self.state_dim = collector.Nstates
             self.u_dim = collector.udim
         elif env_name == "G1":
-            collector = G1Go2DataCollecter(env_name, use_initial_data=True, normalize=True)
+            collector = G1Go2DataCollecter(env_name, use_initial_data=False, normalize=self.normalize)
             self.state_dim = 87
             self.u_dim = 37
         elif env_name == "Go2":
-            collector = G1Go2DataCollecter(env_name, use_initial_data=True, normalize=True)
+            collector = G1Go2DataCollecter(env_name, use_initial_data=False, normalize=self.normalize)
             self.state_dim = 37
             self.u_dim = 12
         else:
             raise ValueError("Unknown environment name.")
-
+        
         if not os.path.exists(data_path):
             data = collector.collect_koopman_data(train_samples+val_samples+test_samples, Ksteps)
+            # Apply uniform normalization to state data if enabled.
+            if self.normalize:
+                if self.u_dim is None:
+                    # For environments with only state data.
+                    data_mean = np.mean(data, axis=(0,1))
+                    data_std = np.std(data, axis=(0,1))
+                    data = (data - data_mean) / data_std
+                else:
+                    # For environments with both action and state; only normalize the state part.
+                    state_mean = np.mean(data[..., self.u_dim:], axis=(0,1))
+                    state_std = np.std(data[..., self.u_dim:], axis=(0,1))
+                    data[..., self.u_dim:] = (data[..., self.u_dim:] - state_mean) / state_std
+            
             permutation = np.random.permutation(data.shape[1])
             shuffled = data[:, permutation, :]
             train_data = shuffled[:, :50000, :]
             val_data = shuffled[:, 50000:70000, :]
             test_data = shuffled[:, 70000:90000, :]
-
             torch.save({"Ktrain_data": train_data, "Kval_data": val_data, "Ktest_data": test_data}, data_path)
             
         dataset = torch.load(data_path, weights_only=False)
@@ -272,12 +261,14 @@ class KoopmanDatasetCollector():
     
     def get_data(self):
         return self.train_data, self.val_data, self.test_data
-    
+
 class KoopmanDataset(Dataset):
     def __init__(self, data):
         # data is shape (Ksteps, num_trajectories, data_dim)
         self.data = data
+
     def __len__(self):
-        return self.data.shape[1]     # number of trajectories
+        return self.data.shape[1]  # number of trajectories
+
     def __getitem__(self, idx):
         return self.data[:, idx, :]  # shape (Ksteps, data_dim)
