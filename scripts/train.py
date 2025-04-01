@@ -13,19 +13,23 @@ from network import KoopmanNet
 def get_layers(input_dim, target_dim, layer_depth=5):
     if layer_depth < 2:
         raise ValueError("Layer depth must be at least 2 (input and target layers).")
-
-    layers = [input_dim]
     
-    if input_dim < target_dim:
-        factor = (target_dim / input_dim) ** (1 / (layer_depth - 1))
-        for i in range(1, layer_depth - 1):
-            layers.append(int(math.ceil(layers[-1] * factor)))
-    else:
-        factor = (target_dim / input_dim) ** (1 / (layer_depth - 1))
-        for i in range(1, layer_depth - 1):
-            layers.append(int(math.ceil(layers[-1] * factor)))
+    layers = []
+    for i in range(layer_depth):
+        progress = i / (layer_depth - 1)
+        val = input_dim * (target_dim / input_dim) ** progress
+        
+        if input_dim < target_dim:
+            val = min(val, target_dim)
+            layer_val = int(math.ceil(val))
+        else:
+            val = max(val, target_dim)
+            layer_val = int(math.floor(val))
+        
+        layers.append(layer_val)
 
-    layers.append(target_dim)
+    layers[0] = input_dim
+    layers[-1] = target_dim
     return layers
 
 def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
@@ -66,8 +70,8 @@ def cov_loss(z):
     return torch.norm(off_diag, p='fro')**2
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
-          train_steps=20000, encode_dim=16, layer_depth=5, cov_reg=0, gamma=0.99, seed=42, batch_size=64, 
-          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight=1, normalize=False):
+          train_steps=20000, encode_dim=16, cov_reg=0, gamma=0.99, seed=42, batch_size=64, initial_lr=1e-3, 
+          lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight=1, normalize=False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -97,6 +101,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     print("Validation data shape:", Kval_data.shape)
     print("Test data shape:", Ktest_data.shape)
 
+    layer_depth = math.floor(np.log2(1024/state_dim))
     layers = get_layers(state_dim, encode_dim, layer_depth)
     Nkoopman = state_dim + layers[-1]
 
@@ -215,8 +220,8 @@ def main():
     random_seeds = [1, 2, 3]
     envs = ['LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'Polynomial', 'G1', 'Go2']
     #envs = ['LogisticMap']
-    train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 100000, 'DoublePendulum': 100000, 
-                   'DampingPendulum': 100000, 'Polynomial': 100000, 'LogisticMap': 100000}
+    train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 80000, 'DoublePendulum': 60000, 
+                   'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
 
     for random_seed, env, encode_dim, cov_reg in itertools.product(random_seeds, envs, encode_dims, cov_regs):
         if env == "Polynomial" or env == "LogisticMap":
@@ -224,17 +229,12 @@ def main():
         else:
             Ksteps = 15
 
-        if env == "G1" or env == "Go2":
-            layer_depth = 3
-        else:
-            layer_depth = 5
-
         if env == "Franka" or env == "LogisticMap":
             normalize = False
         else:
             normalize = True
 
-        train(project_name=f'Koopman_Results_Mar_31_2',
+        train(project_name=f'Koopman_Results_Apr_1',
               env_name=env,
               train_samples=60000,
               val_samples=20000,
@@ -242,7 +242,6 @@ def main():
               Ksteps=Ksteps,
               train_steps=train_steps[env],
               encode_dim=encode_dim,
-              layer_depth=layer_depth,
               cov_reg=cov_reg,
               gamma=0.8,
               seed=random_seed,
