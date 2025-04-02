@@ -73,8 +73,10 @@ def main():
     results = {}
 
     for env, dim, cov, seed in itertools.product(ENVIRONMENTS, ENCODE_DIMS, COV_REGS, SEEDS):
-        if env == "Franka":
+        if env == "Franka" or env == "LogisticMap":
             NORMALIZE = False
+        else:
+            NORMALIZE = True
         norm_str = "norm" if NORMALIZE else "nonorm"
         model_fname = f"best_model_{norm_str}_{env}_{dim}_{cov}_{seed}.pth"
         model_path = os.path.join(MODEL_DIR, model_fname)
