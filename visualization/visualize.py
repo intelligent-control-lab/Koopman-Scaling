@@ -1,254 +1,270 @@
 import os
+import glob
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import itertools
 import sys
-import argparse
 sys.path.append('../scripts')
 
 from dataset import KoopmanDatasetCollector
 from network import KoopmanNet
-from train import cov_loss
 
-def compute_multistep_error(net, test_data, u_dim, gamma, device="cpu"):
-    """Compute multi-step error using forward predictions."""
-    mse_per_step = []
-    net.eval()
-    with torch.no_grad():
-        steps = test_data.shape[0]
-        data_dim = test_data.shape[2]
-        state_dim = data_dim if u_dim is None else data_dim - u_dim
-        test_data = torch.tensor(test_data, dtype=torch.double, device=device)
-        X_current = net.encode(test_data[0, :, u_dim:] if u_dim else test_data[0, :])
-        for i in range(1, steps):
-            X_current = net.forward(X_current, test_data[i-1, :, :u_dim] if u_dim is not None else None)
-            pred_state = X_current[:, :state_dim]
-            true_state = test_data[i, :, u_dim:] if u_dim else test_data[i, :]
-            mse_per_step.append(torch.mean((pred_state - true_state) ** 2).item())
-        final_error = mse_per_step[-1] if mse_per_step else None
-    return mse_per_step, final_error
+# ---------------- Utility Functions ----------------
 
-def evaluate_on_test(net, test_data, device="cpu", gamma=0.8, u_dim=None):
-    """Evaluate network on test data computing covariance loss and final-step MSE."""
-    net.eval()
-    test_tensor = torch.tensor(test_data, dtype=torch.double, device=device)
-    state_dim = test_tensor.shape[2] if u_dim is None else test_tensor.shape[2] - u_dim
-    with torch.no_grad():
-        init_state = test_tensor[0, :, u_dim:] if u_dim is not None else test_tensor[0, :, :]
-        initial_encoding = net.encode(init_state)
-        c_loss = cov_loss(initial_encoding).item()
-    n_steps = test_tensor.shape[0] - 1
-    X_current = net.encode(test_tensor[0, :, u_dim:] if u_dim else test_tensor[0, :])
-    final_mse = None
-    with torch.no_grad():
-        for i in range(n_steps):
-            X_current = net.forward(X_current, test_tensor[i, :, :u_dim] if u_dim is not None else None)
-            pred_state = X_current[:, :state_dim]
-            true_state = test_tensor[i+1, :, u_dim:] if u_dim else test_tensor[i+1, :]
-            final_mse = torch.mean((pred_state - true_state)**2).item()
-    return final_mse, c_loss
+def compute_cov_loss(z):
+    """Compute the off-diagonal Frobenius norm of the covariance of z."""
+    z_mean = torch.mean(z, dim=0, keepdim=True)
+    z_centered = z - z_mean
+    cov_matrix = (z_centered.t() @ z_centered) / (z_centered.size(0) - 1)
+    diag_cov = torch.diag(torch.diag(cov_matrix))
+    off_diag = cov_matrix - diag_cov
+    return torch.norm(off_diag, p='fro')**2
+
+def compute_overall_metrics(model, test_data, u_dim, gamma, device):
+    """
+    Computes the overall weighted multi-step prediction error and covariance loss.
+    Returns:
+      - overall_error: weighted prediction error (scalar)
+      - cov_loss_value: covariance loss on the initial encoding (scalar)
+      - encode_out_dim: dimension of the encoded features (used for normalization)
+    """
+    mse_loss = torch.nn.MSELoss()
+    test_data = test_data.to(device)
+    
+    if u_dim is None:
+        # For environments with only state data.
+        steps, traj_num, state_dim = test_data.shape
+        X_current = model.encode(test_data[0, :])
+        initial_encoding = X_current
+        beta = 1.0
+        beta_sum = 0.0
+        total_loss = 0.0
+        for i in range(steps - 1):
+            X_current = model.forward(X_current, None)
+            beta_sum += beta
+            total_loss += beta * mse_loss(X_current[:, :state_dim], test_data[i + 1, :])
+            beta *= gamma
+        overall_error = total_loss / beta_sum
+    else:
+        # For environments with both action and state data.
+        steps, traj_num, N = test_data.shape
+        state_dim = N - u_dim
+        X_current = model.encode(test_data[0, :, u_dim:])
+        initial_encoding = X_current
+        beta = 1.0
+        beta_sum = 0.0
+        total_loss = 0.0
+        for i in range(steps - 1):
+            X_current = model.forward(X_current, test_data[i, :, :u_dim])
+            beta_sum += beta
+            total_loss += beta * mse_loss(X_current[:, :state_dim], test_data[i + 1, :, u_dim:])
+            beta *= gamma
+        overall_error = total_loss / beta_sum
+
+    cov_loss_value = compute_cov_loss(initial_encoding)
+    return overall_error.item(), cov_loss_value.item(), initial_encoding.shape[1]
+
+def compute_per_step_errors(model, test_data, u_dim, gamma, device):
+    """
+    Computes the prediction error at each prediction step.
+    Returns a list of errors (one per step).
+    """
+    mse_loss = torch.nn.MSELoss()
+    test_data = test_data.to(device)
+    
+    if u_dim is None:
+        steps, traj_num, state_dim = test_data.shape
+        X_current = model.encode(test_data[0, :])
+        errors = []
+        for i in range(steps - 1):
+            X_current = model.forward(X_current, None)
+            error = mse_loss(X_current[:, :state_dim], test_data[i + 1, :])
+            errors.append(error.item())
+    else:
+        steps, traj_num, N = test_data.shape
+        state_dim = N - u_dim
+        X_current = model.encode(test_data[0, :, u_dim:])
+        errors = []
+        for i in range(steps - 1):
+            X_current = model.forward(X_current, test_data[i, :, :u_dim])
+            error = mse_loss(X_current[:, :state_dim], test_data[i + 1, :, u_dim:])
+            errors.append(error.item())
+    return errors
+
+# ---------------- Main Visualization Function ----------------
 
 def main():
-    parser = argparse.ArgumentParser(description='Visualize KoopmanNet results.')
-    parser.add_argument('--envs', nargs='+', default=['LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'Polynomial', 'G1', 'Go2'])
-    parser.add_argument('--log-scale', type=lambda x: (str(x).lower() == 'true'), default=True)
-    args = parser.parse_args()
-
+    # Directories and parameters
+    project_name = "Koopman_Results_Apr_3"
+    model_dir = f"../log/{project_name}/best_models"
+    fig_dir = "figure"
+    os.makedirs(fig_dir, exist_ok=True)
+    
+    # Environments and parameters
+    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
+    random_seeds = [1, 2, 3]
+    encode_dims = [1, 4, 16, 64, 256, 1024]
+    cov_regs = [0, 1]  # 0: covariance loss disabled, 1: enabled
+    gamma = 0.8  # as used in training
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    ENVIRONMENTS = args.envs
-    USE_LOG_SCALE = args.log_scale
-
-    ENCODE_DIMS = [1, 4, 16, 64, 256, 512, 1024]
-    COV_REGS = [0, 1]
-    SEEDS = [1]
-    MODEL_DIR = "../log/best_models"
-    GAMMA = 0.8
-    NORMALIZE = True
-
-    output_folder = "figures"
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-
-    results = {}
-
-    for env, dim, cov, seed in itertools.product(ENVIRONMENTS, ENCODE_DIMS, COV_REGS, SEEDS):
-        if env == "Franka" or env == "LogisticMap":
-            NORMALIZE = False
-        else:
-            NORMALIZE = True
-        norm_str = "norm" if NORMALIZE else "nonorm"
-        model_fname = f"best_model_{norm_str}_{env}_{dim}_{cov}_{seed}.pth"
-        model_path = os.path.join(MODEL_DIR, model_fname)
-        if not os.path.exists(model_path):
-            print(f"[WARNING] No saved model found: {model_path}")
-            continue
-
-        saved_dict = torch.load(model_path, map_location=device)
-        best_state = saved_dict['model']
-        layer_config = saved_dict['layer']
-
+    
+    # Data structures to accumulate metrics.
+    # For each environment, cov_reg option, and encode_dim, we store:
+    #   - overall prediction error (scalar)
+    #   - covariance loss (scalar)
+    #   - per-step prediction error (list of errors over steps)
+    results_overall = {env: {cov: {edim: [] for edim in encode_dims} for cov in cov_regs} for env in envs}
+    results_cov = {env: {cov: {edim: [] for edim in encode_dims} for cov in cov_regs} for env in envs}
+    results_per_step = {env: {cov: {edim: [] for edim in encode_dims} for cov in cov_regs} for env in envs}
+    # Also store the encoding output dimension (for normalization) per model.
+    encode_dims_out = {env: {cov: {} for cov in cov_regs} for env in envs}
+    
+    # Loop over environments
+    for env in envs:
+        print(f"Processing environment: {env}")
+        # For test data, we use the same numbers as in training.
+        train_samples, val_samples, test_samples = 60000, 20000, 20000
+        # Set Ksteps: if env is "Polynomial" or "LogisticMap", use Ksteps=1; else 15.
         Ksteps = 1 if env in ["Polynomial", "LogisticMap"] else 15
-
-        collector = KoopmanDatasetCollector(env_name=env, 
-                                              train_samples=60000,
-                                              val_samples=20000,
-                                              test_samples=20000,
-                                              Ksteps=Ksteps,
-                                              device=device)
-        _, _, test_data = collector.get_data()
-        u_dim = collector.u_dim
+        
+        # Instantiate dataset collector and get test data.
+        norm_str = "nonorm" if env in ["Franka", "LogisticMap"] else "norm"
+        normalize = True if norm_str == "norm" else False
+        collector = KoopmanDatasetCollector(env, train_samples, val_samples, test_samples, Ksteps, device, normalize=normalize)
+        test_data = torch.from_numpy(collector.test_data).double()
         state_dim = collector.state_dim
-        Nkoopman = state_dim + layer_config[-1]
+        u_dim = collector.u_dim  # may be None
+        
+        # Loop over seeds, cov_reg options and encode_dims
+        for seed in random_seeds:
+            for cov_reg in cov_regs:
+                for edim in encode_dims:
+                    # Construct the file name (assuming normalization was used)
+                    model_filename = os.path.join(model_dir, f"best_model_{norm_str}_{env}_{edim}_{cov_reg}_{seed}.pth")
+                    if not os.path.exists(model_filename):
+                        print(f"File not found: {model_filename}. Skipping.")
+                        continue
+                    # Load the saved model
+                    saved = torch.load(model_filename, map_location=device)
+                    layers = saved['layer']
+                    Nkoopman = state_dim + layers[-1]
+                    model = KoopmanNet(layers, Nkoopman, u_dim)
+                    model.load_state_dict(saved['model'])
+                    model.to(device)
+                    model.double()
+                    model.eval()
+                    
+                    # Evaluate overall metrics and per-step errors on the test set.
+                    overall_err, cov_loss_val, enc_out_dim = compute_overall_metrics(model, test_data, u_dim, gamma, device)
+                    per_step_err = compute_per_step_errors(model, test_data, u_dim, gamma, device)
+                    
+                    results_overall[env][cov_reg][edim].append(overall_err)
+                    results_cov[env][cov_reg][edim].append(cov_loss_val)
+                    results_per_step[env][cov_reg][edim].append(per_step_err)
+                    encode_dims_out[env][cov_reg][edim] = enc_out_dim
 
-        net = KoopmanNet(layer_config, Nkoopman, u_dim).to(device).double()
-        net.load_state_dict(best_state)
-        net.eval()
-
-        stepwise_mse, final_mse_multistep = compute_multistep_error(net, test_data, u_dim, GAMMA, device)
-        final_mse, final_cov = evaluate_on_test(net, test_data, device, GAMMA, u_dim)
-
-        results.setdefault(env, {}).setdefault(dim, {}).setdefault(cov, {})[seed] = {
-            "final_mse_multistep": final_mse_multistep,
-            "stepwise_mse": stepwise_mse,
-            "final_mse": final_mse,
-            "final_cov": final_cov/dim
-        }
-
-    for env in ENVIRONMENTS:
-        if env not in results:
-            continue
-
-        dims_available = sorted(results[env].keys())
-        final_means_cov0, final_stds_cov0 = [], []
-        final_means_cov1, final_stds_cov1 = [], []
-
-        for dim in dims_available:
-            for cov in [0, 1]:
-                if cov not in results[env][dim]:
-                    if cov == 0:
-                        final_means_cov0.append(np.nan)
-                        final_stds_cov0.append(0)
-                    else:
-                        final_means_cov1.append(np.nan)
-                        final_stds_cov1.append(0)
-                    continue
-                all_mses = [results[env][dim][cov][seed]["final_mse_multistep"] for seed in results[env][dim][cov]]
-                mean_ms, std_ms = np.mean(all_mses), np.std(all_mses)
-                if cov == 0:
-                    final_means_cov0.append(mean_ms)
-                    final_stds_cov0.append(std_ms)
+    # ---------------- Plotting ----------------
+    # Set up a colormap for different encode dimensions (for per-step plots)
+    cmap = plt.get_cmap("viridis")
+    color_indices = np.linspace(0, 1, len(encode_dims))
+    
+    for env in envs:
+        # Prepare data for Set A: Overall prediction error vs encode dimension.
+        overall_means = {cov: [] for cov in cov_regs}
+        overall_stds = {cov: [] for cov in cov_regs}
+        for cov in cov_regs:
+            for edim in encode_dims:
+                errors = results_overall[env][cov][edim]
+                if errors:
+                    overall_means[cov].append(np.mean(errors))
+                    overall_stds[cov].append(np.std(errors))
                 else:
-                    final_means_cov1.append(mean_ms)
-                    final_stds_cov1.append(std_ms)
-
-        plt.figure()
-        xvals = dims_available
-        plt.errorbar(xvals, final_means_cov0, yerr=final_stds_cov0, marker='o', linestyle='-', capsize=3, label="Cov=Off")
-        plt.errorbar(xvals, final_means_cov1, yerr=final_stds_cov1, marker='o', linestyle='-', capsize=3, label="Cov=On")
-        plt.xlabel("Encoding Dimension")
-        plt.ylabel("Final Test MSE (Multi-step)")
-        plt.title(f"{env}: Final Prediction Error vs. Dimension")
+                    overall_means[cov].append(np.nan)
+                    overall_stds[cov].append(np.nan)
+        x_vals = np.array(encode_dims, dtype=float)
+        
+        plt.figure(figsize=(8, 6))
+        for cov in cov_regs:
+            label = "Covariance Loss Off" if cov == 0 else "Covariance Loss On"
+            y = np.array(overall_means[cov])
+            y_std = np.array(overall_stds[cov])
+            plt.plot(x_vals, y, marker='o', label=label)
+            plt.fill_between(x_vals, y - y_std, y + y_std, alpha=0.3)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.xlabel("Encode Dimension")
+        plt.ylabel("Overall Multi-step Prediction Error")
+        plt.title(f"{env} - Overall Prediction Error")
         plt.legend()
-        plt.grid(True)
-        if USE_LOG_SCALE:
-            plt.yscale("log")
-        plt.savefig(os.path.join(output_folder, f"{env}_finalMSE_vs_dim.png"), dpi=300, bbox_inches="tight")
+        plt.tight_layout()
+        plt.savefig(os.path.join(fig_dir, f"{env}_overall_error.png"))
         plt.close()
-
-        indices = np.arange(len(dims_available))
-        width = 0.35
-
-        plt.figure()
-        plt.bar(indices - width/2, final_means_cov0, width, yerr=final_stds_cov0, label="Cov=Off")
-        plt.bar(indices + width/2, final_means_cov1, width, yerr=final_stds_cov1, label="Cov=On")
-        plt.xticks(indices, dims_available)
-        plt.xlabel("Encoding Dimension")
-        plt.ylabel("Final Test MSE (Multi-step)")
-        plt.title(f"{env}: Cov Reg Comparison (Final MSE)")
+        
+        # Prepare data for Set B: Normalized covariance loss vs encode dimension.
+        norm_cov_means = {cov: [] for cov in cov_regs}
+        norm_cov_stds = {cov: [] for cov in cov_regs}
+        for cov in cov_regs:
+            for edim in encode_dims:
+                cov_losses = results_cov[env][cov][edim]
+                # Normalize by factor = enc_out_dim * (enc_out_dim - 1)
+                norm_losses = []
+                for cl in cov_losses:
+                    enc_dim = encode_dims_out[env][cov].get(edim, None)
+                    if enc_dim is None or enc_dim <= 1:
+                        norm_losses.append(cl)
+                    else:
+                        norm_losses.append(cl / (enc_dim * (enc_dim - 1)))
+                if norm_losses:
+                    norm_cov_means[cov].append(np.mean(norm_losses))
+                    norm_cov_stds[cov].append(np.std(norm_losses))
+                else:
+                    norm_cov_means[cov].append(np.nan)
+                    norm_cov_stds[cov].append(np.nan)
+        
+        plt.figure(figsize=(8, 6))
+        for cov in cov_regs:
+            label = "Covariance Loss Off" if cov == 0 else "Covariance Loss On"
+            y = np.array(norm_cov_means[cov])
+            y_std = np.array(norm_cov_stds[cov])
+            plt.plot(x_vals, y, marker='o', label=label)
+            plt.fill_between(x_vals, y - y_std, y + y_std, alpha=0.3)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.xlabel("Encode Dimension")
+        plt.ylabel("Normalized Covariance Loss")
+        plt.title(f"{env} - Normalized Covariance Loss")
         plt.legend()
-        plt.grid(True)
-        if USE_LOG_SCALE:
-            plt.yscale("log")
-        plt.savefig(os.path.join(output_folder, f"{env}_bar_cov_on_off.png"), dpi=300, bbox_inches="tight")
+        plt.tight_layout()
+        plt.savefig(os.path.join(fig_dir, f"{env}_normalized_cov_loss.png"))
         plt.close()
-
-        for cov in [0, 1]:
-            plt.figure()
-            for dim in dims_available:
-                if cov not in results[env][dim]:
+        
+        # Prepare data for Set C: Per-step prediction error curves.
+        # For each combination (encode dimension, cov_reg), average per-step errors over seeds.
+        plt.figure(figsize=(10, 6))
+        for i, edim in enumerate(encode_dims):
+            color = cmap(color_indices[i])
+            for cov in cov_regs:
+                all_curves = results_per_step[env][cov][edim]
+                if not all_curves:
                     continue
-                all_stepwise = [results[env][dim][cov][seed]["stepwise_mse"] for seed in results[env][dim][cov]]
-                all_stepwise = np.array(all_stepwise)
-                mean_stepwise = np.mean(all_stepwise, axis=0)
-                std_stepwise = np.std(all_stepwise, axis=0)
-                steps_plot = np.arange(1, len(mean_stepwise)+1)
-                plt.errorbar(steps_plot, mean_stepwise, yerr=std_stepwise, marker='o', linestyle='-', capsize=3, label=f"Dim={dim}")
-            plt.xlabel("Prediction Step")
-            plt.ylabel("MSE")
-            plt.title(f"{env}: Multi-step Error (Cov={cov})")
-            plt.legend()
-            plt.grid(True)
-            if USE_LOG_SCALE:
-                plt.yscale("log")
-            plt.savefig(os.path.join(output_folder, f"{env}_multistep_cov{cov}.png"), dpi=300, bbox_inches="tight")
-            plt.close()
-
-        mse_means_cov0, mse_stds_cov0 = [], []
-        cov_means_cov0, cov_stds_cov0 = [], []
-        mse_means_cov1, mse_stds_cov1 = [], []
-        cov_means_cov1, cov_stds_cov1 = [], []
-        for d in dims_available:
-            if 0 in results[env][d]:
-                mses = [results[env][d][0][seed]["final_mse"] for seed in results[env][d][0]]
-                covs = [results[env][d][0][seed]["final_cov"] for seed in results[env][d][0]]
-                mse_means_cov0.append(np.mean(mses))
-                mse_stds_cov0.append(np.std(mses))
-                cov_means_cov0.append(np.mean(covs))
-                cov_stds_cov0.append(np.std(covs))
-            else:
-                mse_means_cov0.append(np.nan)
-                mse_stds_cov0.append(0)
-                cov_means_cov0.append(np.nan)
-                cov_stds_cov0.append(0)
-            if 1 in results[env][d]:
-                mses = [results[env][d][1][seed]["final_mse"] for seed in results[env][d][1]]
-                covs = [results[env][d][1][seed]["final_cov"] for seed in results[env][d][1]]
-                mse_means_cov1.append(np.mean(mses))
-                mse_stds_cov1.append(np.std(mses))
-                cov_means_cov1.append(np.mean(covs))
-                cov_stds_cov1.append(np.std(covs))
-            else:
-                mse_means_cov1.append(np.nan)
-                mse_stds_cov1.append(0)
-                cov_means_cov1.append(np.nan)
-                cov_stds_cov1.append(0)
-
-        fig, ax1 = plt.subplots()
-        xvals = dims_available
-        ax1.errorbar(xvals, mse_means_cov0, yerr=mse_stds_cov0, marker='o', linestyle='-', capsize=3, label="MSE (Cov=Off)")
-        ax1.errorbar(xvals, mse_means_cov1, yerr=mse_stds_cov1, marker='o', linestyle='-', capsize=3, label="MSE (Cov=On)")
-        ax1.set_xlabel("Encoding Dimension")
-        ax1.set_ylabel("Final MSE")
-        ax1.grid(True)
-        ax2 = ax1.twinx()
-        ax2.errorbar(xvals, cov_means_cov0, yerr=cov_stds_cov0, marker='^', linestyle='--', capsize=3, label="CovLoss (Cov=Off)")
-        ax2.errorbar(xvals, cov_means_cov1, yerr=cov_stds_cov1, marker='^', linestyle='--', capsize=3, label="CovLoss (Cov=On)")
-        ax2.set_ylabel("Covariance Loss")
-        if USE_LOG_SCALE:
-            ax1.set_yscale("log")
-            ax2.set_yscale("log")
-        else:
-            ax1.set_yscale("linear")
-            ax2.set_yscale("linear")
-        lines1, labels1 = ax1.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax2.legend(lines1 + lines2, labels1 + labels2, loc='best')
-        plt.title(f"{env} - MSE & CovLoss vs. Encoding Dimension")
-        plt.savefig(os.path.join(output_folder, f"{env}_mse_covloss_vs_dim.png"), dpi=300, bbox_inches="tight")
+                # all_curves is a list of lists; convert to a 2D array: (num_seeds, num_steps)
+                curves_array = np.array(all_curves)
+                mean_curve = np.mean(curves_array, axis=0)
+                std_curve = np.std(curves_array, axis=0)
+                steps = np.arange(1, len(mean_curve) + 1)
+                # Set linestyle: solid for cov=0, dashed for cov=1.
+                linestyle = '-' if cov == 0 else '--'
+                label = f"edim={edim}, {'No CL' if cov == 0 else 'CL'}"
+                plt.plot(steps, mean_curve, color=color, linestyle=linestyle, label=label)
+                plt.fill_between(steps, mean_curve - std_curve, mean_curve + std_curve, color=color, alpha=0.3)
+        plt.xlabel("Step")
+        plt.ylabel("Prediction Error")
+        plt.yscale('log')
+        plt.title(f"{env} - Per-step Prediction Error")
+        plt.legend(fontsize='small', ncol=2)
+        plt.tight_layout()
+        plt.savefig(os.path.join(fig_dir, f"{env}_per_step_error.png"))
         plt.close()
-
-    print("All plots generated successfully!")
 
 if __name__ == "__main__":
     main()
