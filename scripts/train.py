@@ -7,6 +7,7 @@ import itertools
 import wandb
 from torch.utils.data import DataLoader
 import math
+import os
 from dataset import KoopmanDatasetCollector, KoopmanDataset
 from network import KoopmanNet
 
@@ -82,6 +83,9 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
         torch.cuda.manual_seed_all(seed)
 
     norm_str = "norm" if normalize else "nonorm"
+
+    if not os.path.exists(f"../log/best_models/{project_name}/"):
+        os.makedirs(f"../log/best_models/{project_name}/")
 
     print("Loading dataset...")
 
@@ -171,9 +175,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             optimizer.zero_grad()
             loss.backward()
 
-            torch.nn.utils.clip_grad_norm_(net.lA.parameters(), max_norm)
-            if u_dim is not None:
-                torch.nn.utils.clip_grad_norm_(net.lB.parameters(), max_norm)
+            torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm)
 
             optimizer.step()
             scheduler.step()
@@ -195,7 +197,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                         best_loss = copy.copy(Kloss_val)
                         best_state_dict = copy.copy(net.state_dict())
                         saved_dict = {'model':best_state_dict,'layer':layers}
-                        torch.save(saved_dict, f"../log/best_models/best_model_{norm_str}_{env_name}_{encode_dim}_{cov_reg}_{seed}.pth")
+                        torch.save(saved_dict, f"../log/best_models/{project_name}/best_model_{norm_str}_{env_name}_{encode_dim}_{cov_reg}_{seed}.pth")
 
                     wandb.log({
                         "Val/Kloss": Kloss_val.item(),
@@ -218,9 +220,9 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
 def main():
     cov_regs = [0, 1]
-    encode_dims = [1, 4, 16, 64, 256, 512, 1024]
-    random_seeds = [1, 2, 3]
-    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
+    encode_dims = [1, 4, 16, 64, 256, 1024]
+    random_seeds = [1, 2, 3]#[1, 2, 3]
+    envs = ['Franka', 'LogisticMap']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 80000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
 
@@ -235,7 +237,7 @@ def main():
         else:
             normalize = True
 
-        if env == "Franka":
+        if env == "Franka" or env == "LogisticMap":
             max_norm = 0.01
         else:
             max_norm = 1
@@ -247,7 +249,7 @@ def main():
         else:
             layer_depth = None
         
-        train(project_name=f'Test',
+        train(project_name=f'Koopman_Results_Apr_3',
               env_name=env,
               train_samples=60000,
               val_samples=20000,
