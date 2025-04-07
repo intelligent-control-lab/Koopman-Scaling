@@ -234,30 +234,44 @@ class KoopmanDatasetCollector():
         
         if not os.path.exists(data_path):
             data = collector.collect_koopman_data(train_samples+val_samples+test_samples, Ksteps)
-            # Apply uniform normalization to state data if enabled.
-            if self.normalize:
-                if self.u_dim is None:
-                    # For environments with only state data.
-                    data_mean = np.mean(data, axis=(0,1))
-                    data_std = np.std(data, axis=(0,1))
-                    data = (data - data_mean) / data_std
-                else:
-                    # For environments with both action and state; only normalize the state part.
-                    state_mean = np.mean(data[..., self.u_dim:], axis=(0,1))
-                    state_std = np.std(data[..., self.u_dim:], axis=(0,1))
-                    data[..., self.u_dim:] = (data[..., self.u_dim:] - state_mean) / state_std
-            
             permutation = np.random.permutation(data.shape[1])
             shuffled = data[:, permutation, :]
-            train_data = shuffled[:, :50000, :]
-            val_data = shuffled[:, 50000:70000, :]
-            test_data = shuffled[:, 70000:90000, :]
-            torch.save({"Ktrain_data": train_data, "Kval_data": val_data, "Ktest_data": test_data}, data_path)
             
-        dataset = torch.load(data_path, weights_only=False)
-        self.train_data = dataset['Ktrain_data']
-        self.val_data = dataset['Kval_data']
-        self.test_data = dataset['Ktest_data']
+            # Split data based on the sample sizes passed to the constructor.
+            train_data = shuffled[:, :train_samples, :]
+            val_data = shuffled[:, train_samples:train_samples+val_samples, :]
+            test_data = shuffled[:, train_samples+val_samples:train_samples+val_samples+test_samples, :]
+            
+            if self.normalize:
+                if self.u_dim is None:
+                    # For environments with only state data, compute statistics from the train set.
+                    train_mean = np.mean(train_data, axis=(0,1))
+                    train_std = np.std(train_data, axis=(0,1))
+                    train_data = (train_data - train_mean) / train_std
+                    val_data = (val_data - train_mean) / train_std
+                    test_data = (test_data - train_mean) / train_std
+                else:
+                    # For environments with both action and state; normalize each part separately.
+                    # Normalize the action part (first self.u_dim columns)
+                    action_train_mean = np.mean(train_data[..., :self.u_dim], axis=(0,1))
+                    action_train_std = np.std(train_data[..., :self.u_dim], axis=(0,1))
+                    # Normalize the state part (remaining columns)
+                    state_train_mean = np.mean(train_data[..., self.u_dim:], axis=(0,1))
+                    state_train_std = np.std(train_data[..., self.u_dim:], axis=(0,1))
+                    
+                    train_data[..., :self.u_dim] = (train_data[..., :self.u_dim] - action_train_mean) / (action_train_std+1e-8)
+                    train_data[..., self.u_dim:] = (train_data[..., self.u_dim:] - state_train_mean) / (state_train_std)
+                    val_data[..., :self.u_dim] = (val_data[..., :self.u_dim] - action_train_mean) / (action_train_std+1e-8)
+                    val_data[..., self.u_dim:] = (val_data[..., self.u_dim:] - state_train_mean) / (state_train_std)
+                    test_data[..., :self.u_dim] = (test_data[..., :self.u_dim] - action_train_mean) / (action_train_std+1e-8)
+                    test_data[..., self.u_dim:] = (test_data[..., self.u_dim:] - state_train_mean) / (state_train_std)
+            
+            torch.save({"Ktrain_data": train_data, "Kval_data": val_data, "Ktest_data": test_data}, data_path)
+
+        self.train_data = torch.load(data_path, weights_only=False)["Ktrain_data"]
+        self.val_data = torch.load(data_path, weights_only=False)["Kval_data"]
+        self.test_data = torch.load(data_path, weights_only=False)["Ktest_data"]
+
     
     def get_data(self):
         return self.train_data, self.val_data, self.test_data
