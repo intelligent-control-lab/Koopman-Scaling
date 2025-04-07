@@ -7,19 +7,24 @@ import itertools
 import wandb
 from torch.utils.data import DataLoader
 import os
+import math
 from dataset import KoopmanDatasetCollector, KoopmanDataset
 from network import KoopmanNet
 
-def get_layers(input_dim, target_dim):
-    layers = [input_dim]
-    current = input_dim
+# def get_layers(input_dim, target_dim):
+#     layers = [input_dim]
+#     current = input_dim
 
-    while current * 4 < 1024:
-        current *= 4
-        layers.append(current)
+#     while current * 4 < 1024:
+#         current *= 4
+#         layers.append(current)
     
-    layers.append(target_dim)
-    return layers
+#     layers.append(target_dim)
+#     return layers
+
+def get_layers(input_dim, target_dim):
+    hidden_dim = int(round(math.sqrt(input_dim * target_dim)))
+    return [input_dim, hidden_dim, target_dim]
 
 def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
     if u_dim is None:
@@ -205,8 +210,8 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 def main():
     cov_regs = [0, 1]
     encode_dims = [1, 4, 16, 64, 256, 1024]
-    random_seeds = [1]#[1,3,4,5,6,7,8,9,10]
-    envs = ["LogisticMap"]#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
+    random_seeds = [1]#[2,3,4,5,6,7,8,9,10]
+    envs = ['LogisticMap']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
 
@@ -218,7 +223,7 @@ def main():
             Ksteps = 1
         else:
             Ksteps = 10
-        
+
         train(project_name=f'Test',
               env_name=env,
               train_samples=60000,
@@ -232,9 +237,9 @@ def main():
               seed=random_seed,
               batch_size=64,
               val_step=1000,
-              initial_lr=1e-4,
-              lr_step=100,
-              lr_gamma=0.99,
+              initial_lr=1e-3,
+              lr_step=1000,
+              lr_gamma=0.9,
               max_norm=1,
               cov_reg_weight=1,
               normalize=True,
