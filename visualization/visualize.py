@@ -371,14 +371,14 @@ def log_symmetric_band(y: np.ndarray, y_std: np.ndarray):
 # ---------------- Main Visualization Function ----------------
 
 def main():
-    project_name = "Koopman_Results_Apr_3"
+    project_name = "Koopman_Results_Apr_7_1"
     model_dir = f"../log/best_models/{project_name}/"
-    fig_dir = "figure"
+    fig_dir = f"{project_name}_figure"
     os.makedirs(fig_dir, exist_ok=True)
 
-    envs = ['LogisticMap', 'DampingPendulum', 'DoublePendulum']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']  # extend as needed
-    random_seeds = [2, 3, 4, 8, 9]
-    encode_dims = [1, 4, 16, 64, 256, 1024]
+    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']  # extend as needed
+    random_seeds = [1, 2, 3]
+    encode_dims = [4, 16, 64, 256, 1024]
     cov_regs = [0, 1]
     gamma = 0.8
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -393,9 +393,9 @@ def main():
     for env in envs:
         print(f"Processing {env} …")
         train_samples, val_samples, test_samples = 60000, 20000, 20000
-        Ksteps = 1 if env in ["Polynomial", "LogisticMap"] else 15
+        Ksteps = 1 if env in ["Polynomial", "LogisticMap"] else 10
 
-        norm_str = "nonorm" if env in ["Franka", "LogisticMap"] else "norm"
+        norm_str = "norm"#"nonorm" if env in ["Franka", "LogisticMap"] else "norm"
         normalize = norm_str == "norm"
         collector = KoopmanDatasetCollector(env, train_samples, val_samples, test_samples, Ksteps, device, normalize=normalize)
         test_data = torch.from_numpy(collector.test_data).double()
