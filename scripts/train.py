@@ -8,23 +8,18 @@ import wandb
 from torch.utils.data import DataLoader
 import os
 import math
+import sys
+sys.path.append('../utility')
 from dataset import KoopmanDatasetCollector, KoopmanDataset
 from network import KoopmanNet
 
-# def get_layers(input_dim, target_dim):
-#     layers = [input_dim]
-#     current = input_dim
-
-#     while current * 4 < 1024:
-#         current *= 4
-#         layers.append(current)
-    
-#     layers.append(target_dim)
-#     return layers
-
-def get_layers(input_dim, target_dim):
-    hidden_dim = int(round(math.sqrt(input_dim * target_dim)))
-    return [input_dim, hidden_dim, target_dim]
+def get_layers(input_dim, target_dim, depth=2, alpha=0.5):
+    base_width = int(alpha * (input_dim + target_dim))
+    layers = [input_dim]
+    for i in range(depth):
+        layers.append(base_width)
+    layers.append(target_dim)
+    return layers
 
 def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
     if u_dim is None:
@@ -64,7 +59,7 @@ def cov_loss(z):
     return torch.norm(off_diag, p='fro')**2
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
-          train_steps=20000, encode_dim=16, cov_reg=0, gamma=0.99, seed=42, batch_size=64, 
+          train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim_alpha=0.5, cov_reg=0, gamma=0.99, seed=42, batch_size=64, 
           initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight=1, normalize=False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -82,7 +77,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
     print("Loading dataset...")
 
-    data_collector = KoopmanDatasetCollector(env_name, train_samples, val_samples, test_samples, Ksteps, device, normalize=normalize)
+    data_collector = KoopmanDatasetCollector(env_name, train_samples, val_samples, test_samples, Ksteps, normalize=normalize)
     Ktrain_data, Kval_data, Ktest_data = data_collector.get_data()
 
     Ktrain_data = torch.from_numpy(Ktrain_data).float()
@@ -98,8 +93,8 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     print("Validation data shape:", Kval_data.shape)
     print("Test data shape:", Ktest_data.shape)
 
-    layers = get_layers(state_dim, encode_dim)
-    Nkoopman = state_dim + layers[-1]
+    layers = get_layers(state_dim, encode_dim, hidden_layers, hidden_dim_alpha)
+    Nkoopman = state_dim + encode_dim
 
     print("Encoder layers:", layers)
 
@@ -110,7 +105,6 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     optimizer = torch.optim.Adam(net.parameters(), lr=initial_lr)
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
-    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=train_steps, eta_min=0)
     
     for name, param in net.named_parameters():
         print("model:", name, param.requires_grad)
@@ -211,7 +205,7 @@ def main():
     cov_regs = [0, 1]
     encode_dims = [1, 4, 16, 64, 256, 1024]
     random_seeds = [1]#[2,3,4,5,6,7,8,9,10]
-    envs = ['LogisticMap']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
+    envs = ['LogisticMap', 'DampingPendulum', 'Franka', 'DoublePendulum', 'Polynomial', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
 
@@ -224,7 +218,31 @@ def main():
         else:
             Ksteps = 10
 
-        train(project_name=f'Test',
+        if env == "LogisticMap":
+            hidden_layers = 2
+            hidden_dim_alpha = 0.5
+        elif env == "Polynomial":
+            hidden_layers = 2
+            hidden_dim_alpha = 0.5
+        elif env == "DampingPendulum":
+            hidden_layers = 1
+            hidden_dim_alpha = 0.5
+        elif env == "Franka":
+            hidden_layers = 2
+            hidden_dim_alpha = 0.5
+        elif env == "DoublePendulum":
+            hidden_layers = 1
+            hidden_dim_alpha = 0.5
+        elif env == "G1":
+            hidden_layers = 1
+            hidden_dim_alpha = 0.5
+        elif env == "Go2":
+            hidden_layers = 1
+            hidden_dim_alpha = 0.5
+        else:
+            raise ValueError(f"Unknown environment: {env}")
+
+        train(project_name=f'Koopman_Results_Apr_8_2',
               env_name=env,
               train_samples=60000,
               val_samples=20000,
@@ -232,6 +250,8 @@ def main():
               Ksteps=Ksteps,
               train_steps=train_steps[env],
               encode_dim=encode_dim,
+              hidden_layers=hidden_layers,
+              hidden_dim_alpha=hidden_dim_alpha,
               cov_reg=cov_reg,
               gamma=0.8,
               seed=random_seed,
@@ -240,7 +260,7 @@ def main():
               initial_lr=1e-3,
               lr_step=1000,
               lr_gamma=0.9,
-              max_norm=1,
+              max_norm=0.1,
               cov_reg_weight=1,
               normalize=True,
               )
