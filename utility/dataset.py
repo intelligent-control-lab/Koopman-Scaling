@@ -10,14 +10,14 @@ class PolynomialDataCollector:
     A data collection module for the toy Koopman example.
     Now parameterized by m and system coefficients.
     """
-    def __init__(self, state_dim=3, m=20, a1=0.9, a2=0.9, a3=0.9, b=np.full((20-2,), 0.9)):
+    def __init__(self, state_dim=3, m=100, a1=0.85, a2=0.9, a3=0.90, b=None):
         self.state_dim = state_dim
         self.m = m
-        self.a1 = a1 if a1 is not None else np.random.uniform(-2, 2)
-        self.a2 = a2 if a2 is not None else np.random.uniform(-2, 2)
-        self.a3 = a3 if a3 is not None else np.random.uniform(-2, 2)
+        self.a1 = a1
+        self.a2 = a2
+        self.a3 = a3
         if b is None:
-            self.b = np.random.uniform(-2, 2, size=(m-2,))
+            self.b = np.linspace(0.9, 0.1, m-2)
         else:
             self.b = b
 
@@ -563,7 +563,8 @@ class KoopmanDatasetCollector():
         self.state_dim = None
 
         if env_name == "Polynomial":
-            collector = PolynomialDataCollector(a1=None, a2=None, a3=None, b=None)
+            #collector = PolynomialDataCollector(a1=None, a2=None, a3=None, b=None)
+            collector = PolynomialDataCollector()
             self.state_dim = collector.state_dim
         elif env_name == "LogisticMap":
             collector = LogisticMapDataCollector()

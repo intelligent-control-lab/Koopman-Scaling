@@ -204,7 +204,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 def main():
     cov_regs = [0, 1]
     encode_dims = [1, 4, 16, 64, 256, 1024]
-    random_seeds = [1]#[2,3,4,5,6,7,8,9,10]
+    random_seeds = [2,3,4,5]#[2,3,4,5,6,7,8,9,10]
     envs = ['LogisticMap', 'DampingPendulum', 'Franka', 'DoublePendulum', 'Polynomial', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
@@ -222,7 +222,7 @@ def main():
             hidden_layers = 2
             hidden_dim_alpha = 0.5
         elif env == "Polynomial":
-            hidden_layers = 2
+            hidden_layers = 5
             hidden_dim_alpha = 0.5
         elif env == "DampingPendulum":
             hidden_layers = 1
@@ -231,7 +231,7 @@ def main():
             hidden_layers = 2
             hidden_dim_alpha = 0.5
         elif env == "DoublePendulum":
-            hidden_layers = 1
+            hidden_layers = 3
             hidden_dim_alpha = 0.5
         elif env == "G1":
             hidden_layers = 1
