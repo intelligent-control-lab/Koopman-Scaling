@@ -90,7 +90,6 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
     print("Train data shape:", Ktrain_data.shape)
     print("Validation data shape:", Kval_data.shape)
-    print("Test data shape:", Ktest_data.shape)
 
     layers = get_layers(state_dim, encode_dim, hidden_layers, hidden_dim_alpha)
     Nkoopman = state_dim + encode_dim
@@ -104,9 +103,6 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     optimizer = torch.optim.Adam(net.parameters(), lr=initial_lr)
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
-    
-    for name, param in net.named_parameters():
-        print("model:", name, param.requires_grad)
 
     wandb.init(project=project_name, 
                name=f"{env_name}_edim{encode_dim}_closs{'on' if cov_reg else 'off'}_seed{seed}",
@@ -114,6 +110,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                     "env_name": env_name,
                     "train_steps": train_steps,
                     "encode_dim": encode_dim,
+                    "hidden_layers": hidden_layers,
                     "c_loss": cov_reg,
                     "gamma": gamma,
                     "Ktrain_samples": Ktrain_data.shape[1],
@@ -204,7 +201,7 @@ def main():
     cov_regs = [0, 1]
     encode_dims = [1, 4, 16, 64, 256, 1024]
     random_seeds = [1,2,3,4,5]
-    envs = ['LogisticMap', 'DampingPendulum', 'Franka', 'DoublePendulum', 'Polynomial', 'G1', 'Go2']
+    envs = ['LogisticMap']#['LogisticMap', 'DampingPendulum', 'Franka', 'DoublePendulum', 'Polynomial', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
 
@@ -218,7 +215,7 @@ def main():
             Ksteps = 10
 
         if env == "LogisticMap":
-            hidden_layers = 5
+            hidden_layers = 6
             hidden_dim_alpha = 0.5
         elif env == "Polynomial":
             hidden_layers = 5
@@ -241,7 +238,7 @@ def main():
         else:
             raise ValueError(f"Unknown environment: {env}")
 
-        train(project_name=f'Test',
+        train(project_name=f'Koopman_Results_Apr_8_2',
               env_name=env,
               train_samples=60000,
               val_samples=20000,
