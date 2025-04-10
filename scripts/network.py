@@ -17,7 +17,6 @@ class ResidualBlock(nn.Module):
         res = self.residual(x)
         return out + res
 
-
 class KoopmanNet(nn.Module):
     def __init__(self, encode_layers, Nkoopman: int, u_dim: int | None):
         super().__init__()
