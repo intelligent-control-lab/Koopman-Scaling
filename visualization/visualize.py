@@ -106,7 +106,7 @@ def main():
     fig_dir = f"{project_name}_figure"
     os.makedirs(fig_dir, exist_ok=True)
 
-    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']  # extend as needed
+    envs = ['Polynomial']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']  # extend as needed
     random_seeds = [1]
     encode_dims = [1, 4, 16, 64, 256, 1024]
     cov_regs = [0, 1]
@@ -128,7 +128,7 @@ def main():
         norm_str = "norm"#"nonorm" if env in ["Franka", "LogisticMap"] else "norm"
         normalize = norm_str == "norm"
         collector = KoopmanDatasetCollector(env, train_samples, val_samples, test_samples, Ksteps, normalize=normalize)
-        test_data = torch.from_numpy(collector.test_data).double()
+        test_data = torch.from_numpy(collector.test_data).float()
         #test_data = test_data[:12, :, :]  # only first 12 steps
         state_dim = collector.state_dim
         u_dim = collector.u_dim
@@ -148,7 +148,7 @@ def main():
                     Nkoopman = state_dim + layers[-1]
                     model = KoopmanNet(layers, Nkoopman, u_dim)
                     model.load_state_dict(saved['model'])
-                    model.to(device).double().eval()
+                    model.to(device).eval()
 
                     overall, cov_loss, enc_out_dim = compute_overall_metrics(model, test_data, u_dim, gamma, device)
                     per_step = compute_per_step_errors(model, test_data, u_dim, gamma, device)
