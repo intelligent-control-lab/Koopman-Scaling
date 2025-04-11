@@ -3,7 +3,6 @@ import numpy as np
 import os
 from torch.utils.data import Dataset
 import pandas as pd
-import scipy.linalg
 import pybullet as pb
 import pybullet_data
 
@@ -190,7 +189,7 @@ class DampingPendulumDataCollector:
 def Obs(o):
     return np.concatenate((o[:3], o[7:]), axis=0)
 
-class FrankaDataCollecter:
+class FrankaDataCollector:
     def __init__(self, render=False, ts=0.002):
         self.render = render
         if self.render:
@@ -273,7 +272,7 @@ class FrankaDataCollecter:
                 data[t, traj, :] = np.concatenate([u.reshape(-1), s0_obs.reshape(-1)])
         return data
 
-class G1Go2DataCollecter():
+class G1Go2DataCollector():
     def __init__(self, env_name, use_initial_data=False):
         if use_initial_data:
             g1_initial_path = 'None_trajnum90000_trajlen100'
@@ -339,7 +338,7 @@ class G1Go2DataCollecter():
     def collect_koopman_data(self, traj_num, steps):
         return self.get_data(self.data_pathes, steps)[:, :traj_num, :]
     
-class KinovaDataCollecter():
+class KinovaDataCollector():
     def __init__(self):
         self.state_dim = 14
         self.u_dim = 7
@@ -386,7 +385,7 @@ class KoopmanDatasetCollector():
             collector = LogisticMapDataCollector()
             self.state_dim = collector.state_dim
         elif env_name == "Franka":
-            collector = FrankaDataCollecter()
+            collector = FrankaDataCollector()
             self.state_dim = collector.state_dim
             self.u_dim = collector.u_dim
         elif env_name == "DoublePendulum":
@@ -398,15 +397,15 @@ class KoopmanDatasetCollector():
             self.state_dim = collector.state_dim
             self.u_dim = collector.u_dim
         elif env_name == "G1":
-            collector = G1Go2DataCollecter(env_name, use_initial_data=False)
+            collector = G1Go2DataCollector(env_name, use_initial_data=False)
             self.state_dim = 87
             self.u_dim = 37
         elif env_name == "Go2":
-            collector = G1Go2DataCollecter(env_name, use_initial_data=False)
+            collector = G1Go2DataCollector(env_name, use_initial_data=False)
             self.state_dim = 37
             self.u_dim = 12
         elif env_name == "Kinova":
-            collector = KinovaDataCollecter()
+            collector = KinovaDataCollector()
             self.state_dim = collector.state_dim
             self.u_dim = collector.u_dim
         else:
