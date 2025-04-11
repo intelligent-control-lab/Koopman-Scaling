@@ -73,76 +73,6 @@ class LogisticMapDataCollector:
                 current_state = next_state
         return data
 
-# class DoublePendulumDataCollector:
-#     def __init__(self, dt=0.05, m1=1.0, m2=1.0, L1=1.0, L2=1.0, g=9.81):
-#         self.dt = dt
-#         self.m1 = m1
-#         self.m2 = m2
-#         self.L1 = L1
-#         self.L2 = L2
-#         self.g = g
-#         self.state_dim = 4
-#         self.u_dim = 2
-
-#     def random_state(self):
-#         theta1 = np.random.uniform(-np.pi, np.pi)
-#         theta2 = np.random.uniform(-np.pi, np.pi)
-#         omega1 = np.random.uniform(-1, 1)
-#         omega2 = np.random.uniform(-1, 1)
-#         return np.array([theta1, theta2, omega1, omega2], dtype=np.float64)
-
-#     def random_control(self):
-#         u1 = np.random.uniform(-1, 1)
-#         u2 = np.random.uniform(-1, 1)
-#         return np.array([u1, u2], dtype=np.float64)
-
-#     def derivatives(self, state, u):
-#         th1, th2, dth1, dth2 = state
-#         u = np.array(u).reshape(2, 1)
-
-#         m1, m2, l1, l2, g = self.m1, self.m2, self.L1, self.L2, self.g
-#         c2 = np.cos(th2)
-#         s2 = np.sin(th2)
-
-#         # Inertia (mass) matrix
-#         M = np.zeros((2, 2))
-#         M[0, 0] = m1 * l1**2 + m2 * (l1**2 + 2 * l1 * l2 * c2 + l2**2)
-#         M[0, 1] = m2 * (l1 * l2 * c2 + l2**2)
-#         M[1, 0] = M[0, 1]
-#         M[1, 1] = m2 * l2**2
-
-#         # Coriolis/Centrifugal
-#         C = np.zeros((2, 1))
-#         C[0, 0] = -m2 * l1 * l2 * s2 * (2 * dth1 * dth2 + dth2**2)
-#         C[1, 0] = m2 * l1 * l2 * dth1**2 * s2
-
-#         # Gravity
-#         G = np.zeros((2, 1))
-#         G[0, 0] = (m1 + m2) * l1 * g * np.cos(th1) + m2 * g * l2 * np.cos(th1 + th2)
-#         G[1, 0] = m2 * g * l2 * np.cos(th1 + th2)
-
-#         # Accelerations
-#         Minv = scipy.linalg.pinv(M)
-#         ddth = (Minv @ (u - C - G)).flatten()
-
-#         return np.array([dth1, dth2, ddth[0], ddth[1]], dtype=np.float64)
-
-#     def simulate_dynamics(self, state, u):
-#         deriv = self.derivatives(state, u)
-#         next_state = state + self.dt * deriv
-#         return next_state
-
-#     def collect_koopman_data(self, traj_num, steps):
-#         data = np.empty((steps + 1, traj_num, self.state_dim + self.u_dim), dtype=np.float64)
-#         for traj in range(traj_num):
-#             state = self.random_state()
-#             control = self.random_control()
-#             data[0, traj, :] = np.concatenate([control, state])
-#             for i in range(1, steps + 1):
-#                 control = self.random_control()
-#                 state = self.simulate_dynamics(state, control)
-#                 data[i, traj, :] = np.concatenate([control, state])
-#         return data
 class DoublePendulumDataCollector:
     def __init__(self, dt=0.05, m1=1.0, m2=1.0, L1=1.0, L2=1.0, g=9.81):
         self.dt = dt
@@ -215,55 +145,6 @@ class DoublePendulumDataCollector:
                 data[i, traj, :] = np.concatenate([control, state])
         return data
 
-
-# class DampingPendulumDataCollector:
-#     def __init__(self, dt=0.02, L=1.0, g=9.81, m=1.0, b=1):
-#         self.dt = dt
-#         self.L = L
-#         self.g = g
-#         self.m = m
-#         self.b = b
-#         self.state_dim = 2
-#         self.u_dim = 1
-
-#     def random_state(self):
-#         theta = np.random.uniform(-np.pi, np.pi)  # full circle as before
-#         omega = np.random.uniform(-1, 1)
-#         return np.array([theta, omega], dtype=np.float64)
-
-#     def random_control(self):
-#         u = np.random.uniform(-1, 1)  # keep your original range
-#         return np.array([u], dtype=np.float64)
-
-#     def derivatives(self, state, u):
-#         theta, omega = state
-#         control = u[0]
-
-#         dtheta = omega
-#         torque_gravity = - (self.g / self.L) * np.sin(theta)
-#         torque_damping = - (self.b * self.L * omega) / self.m
-#         torque_control = (np.cos(theta) * control) / (self.m * self.L)
-
-#         domega = torque_gravity + torque_damping + torque_control
-
-#         return np.array([dtheta, domega], dtype=np.float64)
-
-#     def simulate_dynamics(self, state, u):
-#         deriv = self.derivatives(state, u)
-#         next_state = state + self.dt * deriv
-#         return next_state
-
-#     def collect_koopman_data(self, traj_num, steps):
-#         data = np.empty((steps + 1, traj_num, self.state_dim + self.u_dim), dtype=np.float64)
-#         for traj in range(traj_num):
-#             state = self.random_state()
-#             control = self.random_control()
-#             data[0, traj, :] = np.concatenate([control, state])
-#             for i in range(1, steps + 1):
-#                 control = self.random_control()
-#                 state = self.simulate_dynamics(state, control)
-#                 data[i, traj, :] = np.concatenate([control, state])
-#         return data
 class DampingPendulumDataCollector:
     def __init__(self, dt=0.02, L=1.0, g=9.81, damping=0.5):
         self.dt = dt

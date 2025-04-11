@@ -193,19 +193,19 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     else:
         convergence_loss = np.mean(val_losses) if len(val_losses) > 0 else None
 
-    print("END - Best loss: {}  Convergence loss: {}".format(best_loss, convergence_loss))
-    wandb.log({"best_loss": best_loss, "convergence_loss": convergence_loss})
+    print("END - Best loss: {}  Convergence loss: {}".format(best_loss.item(), convergence_loss))
+    wandb.log({"best_loss": best_loss.item(), "convergence_loss": convergence_loss})
     wandb.finish()
 
 def main():
     cov_regs = [0, 1]
-    encode_dims = [4, 16, 64, 256, 1024]#[256, 1024]
+    encode_dims = [4, 16, 64, 256, 1024]
     random_seeds = [1,2,3,4,5]
     envs = ['LogisticMap']#['LogisticMap', 'DampingPendulum', 'Franka', 'DoublePendulum', 'Polynomial', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 100000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
     hidden_layers = {'G1': 1, 'Go2': 1, 'Kinova': 1, 'Franka': 2, 'DoublePendulum': 3,
-                     'DampingPendulum': 7, 'Polynomial': 5, 'LogisticMap': 7}
+                     'DampingPendulum': 4, 'Polynomial': 5, 'LogisticMap': 7}
     project_name = 'Koopman_Results_Apr_8_2'
 
     cov_regs = [0, 1]
