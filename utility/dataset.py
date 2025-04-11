@@ -2,6 +2,8 @@ import torch
 import numpy as np
 import os
 from torch.utils.data import Dataset
+import pandas as pd
+import scipy.linalg
 import pybullet as pb
 import pybullet_data
 
@@ -46,7 +48,7 @@ class PolynomialDataCollector:
         return data
 
 class LogisticMapDataCollector:
-    def __init__(self, state_dim=1, lambda_param=2.5):
+    def __init__(self, state_dim=1, lambda_param=3.8):
         self.state_dim = state_dim
         if lambda_param is not None:
             self.lambda_param = lambda_param
@@ -71,6 +73,76 @@ class LogisticMapDataCollector:
                 current_state = next_state
         return data
 
+# class DoublePendulumDataCollector:
+#     def __init__(self, dt=0.05, m1=1.0, m2=1.0, L1=1.0, L2=1.0, g=9.81):
+#         self.dt = dt
+#         self.m1 = m1
+#         self.m2 = m2
+#         self.L1 = L1
+#         self.L2 = L2
+#         self.g = g
+#         self.state_dim = 4
+#         self.u_dim = 2
+
+#     def random_state(self):
+#         theta1 = np.random.uniform(-np.pi, np.pi)
+#         theta2 = np.random.uniform(-np.pi, np.pi)
+#         omega1 = np.random.uniform(-1, 1)
+#         omega2 = np.random.uniform(-1, 1)
+#         return np.array([theta1, theta2, omega1, omega2], dtype=np.float64)
+
+#     def random_control(self):
+#         u1 = np.random.uniform(-1, 1)
+#         u2 = np.random.uniform(-1, 1)
+#         return np.array([u1, u2], dtype=np.float64)
+
+#     def derivatives(self, state, u):
+#         th1, th2, dth1, dth2 = state
+#         u = np.array(u).reshape(2, 1)
+
+#         m1, m2, l1, l2, g = self.m1, self.m2, self.L1, self.L2, self.g
+#         c2 = np.cos(th2)
+#         s2 = np.sin(th2)
+
+#         # Inertia (mass) matrix
+#         M = np.zeros((2, 2))
+#         M[0, 0] = m1 * l1**2 + m2 * (l1**2 + 2 * l1 * l2 * c2 + l2**2)
+#         M[0, 1] = m2 * (l1 * l2 * c2 + l2**2)
+#         M[1, 0] = M[0, 1]
+#         M[1, 1] = m2 * l2**2
+
+#         # Coriolis/Centrifugal
+#         C = np.zeros((2, 1))
+#         C[0, 0] = -m2 * l1 * l2 * s2 * (2 * dth1 * dth2 + dth2**2)
+#         C[1, 0] = m2 * l1 * l2 * dth1**2 * s2
+
+#         # Gravity
+#         G = np.zeros((2, 1))
+#         G[0, 0] = (m1 + m2) * l1 * g * np.cos(th1) + m2 * g * l2 * np.cos(th1 + th2)
+#         G[1, 0] = m2 * g * l2 * np.cos(th1 + th2)
+
+#         # Accelerations
+#         Minv = scipy.linalg.pinv(M)
+#         ddth = (Minv @ (u - C - G)).flatten()
+
+#         return np.array([dth1, dth2, ddth[0], ddth[1]], dtype=np.float64)
+
+#     def simulate_dynamics(self, state, u):
+#         deriv = self.derivatives(state, u)
+#         next_state = state + self.dt * deriv
+#         return next_state
+
+#     def collect_koopman_data(self, traj_num, steps):
+#         data = np.empty((steps + 1, traj_num, self.state_dim + self.u_dim), dtype=np.float64)
+#         for traj in range(traj_num):
+#             state = self.random_state()
+#             control = self.random_control()
+#             data[0, traj, :] = np.concatenate([control, state])
+#             for i in range(1, steps + 1):
+#                 control = self.random_control()
+#                 state = self.simulate_dynamics(state, control)
+#                 data[i, traj, :] = np.concatenate([control, state])
+#         return data
 class DoublePendulumDataCollector:
     def __init__(self, dt=0.05, m1=1.0, m2=1.0, L1=1.0, L2=1.0, g=9.81):
         self.dt = dt
@@ -144,8 +216,56 @@ class DoublePendulumDataCollector:
         return data
 
 
+# class DampingPendulumDataCollector:
+#     def __init__(self, dt=0.02, L=1.0, g=9.81, m=1.0, b=1):
+#         self.dt = dt
+#         self.L = L
+#         self.g = g
+#         self.m = m
+#         self.b = b
+#         self.state_dim = 2
+#         self.u_dim = 1
+
+#     def random_state(self):
+#         theta = np.random.uniform(-np.pi, np.pi)  # full circle as before
+#         omega = np.random.uniform(-1, 1)
+#         return np.array([theta, omega], dtype=np.float64)
+
+#     def random_control(self):
+#         u = np.random.uniform(-1, 1)  # keep your original range
+#         return np.array([u], dtype=np.float64)
+
+#     def derivatives(self, state, u):
+#         theta, omega = state
+#         control = u[0]
+
+#         dtheta = omega
+#         torque_gravity = - (self.g / self.L) * np.sin(theta)
+#         torque_damping = - (self.b * self.L * omega) / self.m
+#         torque_control = (np.cos(theta) * control) / (self.m * self.L)
+
+#         domega = torque_gravity + torque_damping + torque_control
+
+#         return np.array([dtheta, domega], dtype=np.float64)
+
+#     def simulate_dynamics(self, state, u):
+#         deriv = self.derivatives(state, u)
+#         next_state = state + self.dt * deriv
+#         return next_state
+
+#     def collect_koopman_data(self, traj_num, steps):
+#         data = np.empty((steps + 1, traj_num, self.state_dim + self.u_dim), dtype=np.float64)
+#         for traj in range(traj_num):
+#             state = self.random_state()
+#             control = self.random_control()
+#             data[0, traj, :] = np.concatenate([control, state])
+#             for i in range(1, steps + 1):
+#                 control = self.random_control()
+#                 state = self.simulate_dynamics(state, control)
+#                 data[i, traj, :] = np.concatenate([control, state])
+#         return data
 class DampingPendulumDataCollector:
-    def __init__(self, dt=0.05, L=1.0, g=9.81, damping=0.5):
+    def __init__(self, dt=0.02, L=1.0, g=9.81, damping=0.5):
         self.dt = dt
         self.L = L
         self.g = g
@@ -189,90 +309,6 @@ class DampingPendulumDataCollector:
 def Obs(o):
     return np.concatenate((o[:3], o[7:]), axis=0)
 
-# class FrankaDataCollecter:
-#     def __init__(self, render=False, ts=0.002):
-#         self.render = render
-#         if self.render:
-#             self.client = pb.connect(pb.GUI)
-#         else:
-#             self.client = pb.connect(pb.DIRECT)
-
-#         self.ts = ts
-#         self.frame_skip = 10
-#         pb.setTimeStep(self.ts)
-#         pb.setAdditionalSearchPath(pybullet_data.getDataPath())
-
-#         pb.loadURDF('plane.urdf')
-
-#         base_path = os.path.dirname(os.path.abspath(__file__))
-#         urdf_path = os.path.join(base_path, "franka_description/robots/franka_panda.urdf")
-#         self.robot = pb.loadURDF(urdf_path, [0., 0., 0.], useFixedBase=1)
-        
-#         pb.setGravity(0, 0, -9.81)
-
-#         self.reset_joint_state = [0., -0.78, 0., -2.35, 0., 1.57, 0.78]
-#         self.joint_low = np.array([-2.9, -1.8, -2.9, -3.0, -2.9, -0.08, -2.9])
-#         self.joint_high = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9])
-#         self.sat_val = 0.3
-        
-#         self.state_dim = 17
-#         self.u_dim = 7
-#         self.uval = 0.12
-#         self.dt = self.frame_skip * self.ts
-
-#         self.init_joint_noise_scale = 0.3
-
-#         self.reset()
-
-#     def get_state(self):
-#         joint_states = pb.getJointStates(self.robot, list(range(7)))
-#         ee_state = pb.getLinkState(self.robot, 7)[-2:]
-#         jnt_angles = [state[0] for state in joint_states]
-#         jnt_velocities = [state[1] for state in joint_states]
-#         full_state = np.concatenate([ee_state[0], ee_state[1], jnt_angles, jnt_velocities])
-#         return full_state.copy()
-
-#     def reset(self):
-#         for i, jnt in enumerate(self.reset_joint_state):
-#             pb.resetJointState(self.robot, i, jnt)
-#         return self.get_state()
-
-#     def reset_state(self, joint_state):
-#         for i, jnt in enumerate(joint_state):
-#             pb.resetJointState(self.robot, i, jnt)
-#         return self.get_state()
-
-#     def step(self, action):
-#         a = np.clip(action, -self.sat_val, self.sat_val)
-#         pb.setJointMotorControlArray(
-#             self.robot, list(range(7)),
-#             controlMode=pb.VELOCITY_CONTROL, targetVelocities=a)
-#         for _ in range(self.frame_skip):
-#             pb.stepSimulation()
-#         return self.get_state()
-
-#     def generate_random_control(self):
-#         scale = np.random.uniform(0.8, 1.2)
-#         return (np.random.rand(7) - 0.5) * 2 * (self.uval * scale)
-
-#     def collect_koopman_data(self, traj_num, steps):
-#         data = np.empty((steps + 1, traj_num, self.u_dim + self.state_dim), dtype=np.float64)
-#         for traj in range(traj_num):
-#             noise = (np.random.rand(7) - 0.5) * 2 * self.init_joint_noise_scale
-#             joint_init = np.array(self.reset_joint_state) + noise
-#             joint_init = np.clip(joint_init, self.joint_low, self.joint_high)
-#             s0 = self.reset_state(joint_init)
-#             s0_obs = Obs(s0)
-#             u = self.generate_random_control()
-#             data[0, traj, :] = np.concatenate([u.reshape(-1), s0_obs.reshape(-1)])
-#             if traj % 1000 == 0:
-#                 print("Trajectory:", traj)
-#             for t in range(1, steps + 1):
-#                 s0 = self.step(u)
-#                 s0_obs = Obs(s0)
-#                 u = self.generate_random_control()
-#                 data[t, traj, :] = np.concatenate([u.reshape(-1), s0_obs.reshape(-1)])
-#         return data
 class FrankaDataCollecter:
     def __init__(self, render=False, ts=0.002):
         self.render = render
@@ -285,7 +321,6 @@ class FrankaDataCollecter:
         self.frame_skip = 10
         pb.setTimeStep(self.ts)
         pb.setAdditionalSearchPath(pybullet_data.getDataPath())
-
         pb.loadURDF('plane.urdf')
 
         base_path = os.path.dirname(os.path.abspath(__file__))
@@ -294,25 +329,18 @@ class FrankaDataCollecter:
         
         pb.setGravity(0, 0, -9.81)
 
-        # Original reset position as nominal; 
-        # We might not use it now if we sample uniformly.
         self.reset_joint_state = [0., -0.78, 0., -2.35, 0., 1.57, 0.78]
-        
-        # Joint limits as provided.
         self.joint_low = np.array([-2.9, -1.8, -2.9, -3.0, -2.9, -0.08, -2.9])
         self.joint_high = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9])
-        
-        # Increase saturation and baseline control amplitude to explore stronger dynamics.
-        self.sat_val = 0.35  
-        self.uval = 0.25  
+
+        self.sat_val = 0.35
+        #self.uval = 0.25
         
         self.state_dim = 17
         self.u_dim = 7
-        
         self.dt = self.frame_skip * self.ts
 
-        # Optionally, you could reduce noise here as we now use uniform sampling.
-        self.init_joint_noise_scale = 0.3  
+        self.init_joint_noise_scale = 0.3
 
         self.reset()
 
@@ -321,12 +349,14 @@ class FrankaDataCollecter:
         ee_state = pb.getLinkState(self.robot, 7)[-2:]
         jnt_angles = [state[0] for state in joint_states]
         jnt_velocities = [state[1] for state in joint_states]
+
         full_state = np.concatenate([ee_state[0], ee_state[1], jnt_angles, jnt_velocities])
         return full_state.copy()
 
     def reset(self):
-        # Instead of using a baseline with small noise, sample a new joint configuration uniformly.
-        joint_init = np.random.uniform(low=self.joint_low, high=self.joint_high, size=7)
+        noise = (np.random.rand(7) - 0.5) * 2 * self.init_joint_noise_scale
+        joint_init = np.array(self.reset_joint_state) + noise
+        joint_init = np.clip(joint_init, self.joint_low, self.joint_high)
         return self.reset_state(joint_init)
 
     def reset_state(self, joint_state):
@@ -335,7 +365,6 @@ class FrankaDataCollecter:
         return self.get_state()
 
     def step(self, action):
-        # Even with the new generation, continue to clip for safety.
         a = np.clip(action, -self.sat_val, self.sat_val)
         pb.setJointMotorControlArray(
             self.robot, list(range(7)),
@@ -345,14 +374,11 @@ class FrankaDataCollecter:
         return self.get_state()
 
     def generate_random_control(self):
-        # Generate a random control uniformly for each joint within the full control range.
-        # This bypasses the additional scaling randomness, providing a broader distribution.
         return np.random.uniform(-self.sat_val, self.sat_val, size=self.u_dim)
 
     def collect_koopman_data(self, traj_num, steps):
         data = np.empty((steps + 1, traj_num, self.u_dim + self.state_dim), dtype=np.float64)
         for traj in range(traj_num):
-            # Use the new random initialization from reset()
             s0 = self.reset()
             s0_obs = Obs(s0)
             u = self.generate_random_control()
@@ -366,7 +392,6 @@ class FrankaDataCollecter:
                 data[t, traj, :] = np.concatenate([u.reshape(-1), s0_obs.reshape(-1)])
         return data
 
-
 class G1Go2DataCollecter():
     def __init__(self, env_name, use_initial_data=False):
         if use_initial_data:
@@ -374,9 +399,9 @@ class G1Go2DataCollecter():
             go2_initial_path = 'None_trajnum89947_trajlen100'
             try:
                 if env_name == 'Go2':
-                    initial_dataset_path = f"../data/datasets/unitree_go2_flat/initial_dataset/{go2_initial_path}.npz"
+                    initial_dataset_path = f"../data/unitree_go2_flat/initial_dataset/{go2_initial_path}.npz"
                 elif env_name == 'G1':
-                    initial_dataset_path = f"../data/datasets/g1_flat/initial_dataset/{g1_initial_path}.npz"
+                    initial_dataset_path = f"../data/g1_flat/initial_dataset/{g1_initial_path}.npz"
             except:
                 raise ValueError("Dataset not found for the given environment.")
             self.data_pathes = [initial_dataset_path]
@@ -432,6 +457,36 @@ class G1Go2DataCollecter():
     
     def collect_koopman_data(self, traj_num, steps):
         return self.get_data(self.data_pathes, steps)[:, :traj_num, :]
+    
+class KinovaDataCollecter():
+    def __init__(self):
+        self.state_dim = 14
+        self.u_dim = 7
+        self.data_pathes = ['output_20250402_172619.txt',
+                            'output_20250402_182836.txt',
+                            'output_20250402_195709.txt',
+                            'output_20250402_205831.txt',
+                            'output_20250403_104412.txt']
+    
+    def get_data(self, data_paths, steps=10):
+        def process_data(file_path):
+            df = pd.read_csv(f'../data/kinova_data/{file_path}', 
+                        delimiter=' ', 
+                        header=None,
+                        on_bad_lines='skip', 
+                        engine='python')
+            arr = df.to_numpy()
+            total_data = arr.shape[0]
+            trimmed_len = (total_data // steps) * steps
+            trimmed = arr[:trimmed_len]
+            return trimmed.reshape(steps, -1, arr.shape[1])
+        lst = []
+        for path in data_paths:
+            lst.append(process_data(path))
+        return np.concatenate(lst, axis=1)
+
+    def collect_koopman_data(self, traj_num, steps):
+        return self.get_data(self.data_pathes, steps)[:, :traj_num, :]
 
 class KoopmanDatasetCollector():
     def __init__(self, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15, normalize=True):
@@ -469,6 +524,10 @@ class KoopmanDatasetCollector():
             collector = G1Go2DataCollecter(env_name, use_initial_data=False)
             self.state_dim = 37
             self.u_dim = 12
+        elif env_name == "Kinova":
+            collector = KinovaDataCollecter()
+            self.state_dim = collector.state_dim
+            self.u_dim = collector.u_dim
         else:
             raise ValueError("Unknown environment name.")
         
