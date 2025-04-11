@@ -13,7 +13,7 @@ from dataset import KoopmanDatasetCollector, KoopmanDataset
 from network import KoopmanNet
 
 def get_layers(input_dim, target_dim, depth=2, alpha=0.5):
-    base_width = int(alpha * (input_dim + target_dim))
+    base_width = max(int(alpha * (input_dim + target_dim)), 1)
     layers = [input_dim]
     for i in range(depth):
         layers.append(base_width)
@@ -58,7 +58,7 @@ def cov_loss(z):
     return torch.norm(off_diag, p='fro')**2
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
-          train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim_alpha=0.5, cov_reg=0, gamma=0.99, seed=42, batch_size=64, 
+          train_steps=20000, encode_dim=16, hidden_layers=2, cov_reg=0, gamma=0.99, seed=42, batch_size=64, 
           initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight=1, normalize=False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -91,7 +91,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     print("Train data shape:", Ktrain_data.shape)
     print("Validation data shape:", Kval_data.shape)
 
-    layers = get_layers(state_dim, encode_dim, hidden_layers, hidden_dim_alpha)
+    layers = get_layers(state_dim, encode_dim, hidden_layers)
     Nkoopman = state_dim + encode_dim
 
     print("Encoder layers:", layers)
@@ -199,46 +199,33 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
 def main():
     cov_regs = [0, 1]
-    encode_dims = [1, 4, 16, 64, 256, 1024]
+    encode_dims = [4, 16, 64, 256, 1024]#[256, 1024]
     random_seeds = [1,2,3,4,5]
     envs = ['LogisticMap']#['LogisticMap', 'DampingPendulum', 'Franka', 'DoublePendulum', 'Polynomial', 'G1', 'Go2']
-    train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000, 
+    train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 100000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
+    hidden_layers = {'G1': 1, 'Go2': 1, 'Kinova': 1, 'Franka': 2, 'DoublePendulum': 3,
+                     'DampingPendulum': 7, 'Polynomial': 5, 'LogisticMap': 7}
+    project_name = 'Koopman_Results_Apr_8_2'
+
+    cov_regs = [0, 1]
+    encode_dims = [4, 16]
+    random_seeds = [3, 1]
+    envs = ['DampingPendulum']
+    project_name = 'Test'
 
     for random_seed, env, encode_dim, cov_reg in itertools.product(random_seeds, envs, encode_dims, cov_regs):
-        if encode_dim == 1 and cov_reg == 1:
-            continue
-
         if env == "Polynomial" or env == "LogisticMap":
             Ksteps = 1
         else:
             Ksteps = 10
 
         if env == "LogisticMap":
-            hidden_layers = 6
-            hidden_dim_alpha = 0.5
-        elif env == "Polynomial":
-            hidden_layers = 5
-            hidden_dim_alpha = 0.5
-        elif env == "DampingPendulum":
-            hidden_layers = 1
-            hidden_dim_alpha = 0.5
-        elif env == "Franka":
-            hidden_layers = 2
-            hidden_dim_alpha = 0.5
-        elif env == "DoublePendulum":
-            hidden_layers = 3
-            hidden_dim_alpha = 0.5
-        elif env == "G1":
-            hidden_layers = 1
-            hidden_dim_alpha = 0.5
-        elif env == "Go2":
-            hidden_layers = 1
-            hidden_dim_alpha = 0.5
+            cov_reg_weight = 0.001
         else:
-            raise ValueError(f"Unknown environment: {env}")
+            cov_reg_weight = 1
 
-        train(project_name=f'Koopman_Results_Apr_8_2',
+        train(project_name=project_name,
               env_name=env,
               train_samples=60000,
               val_samples=20000,
@@ -246,8 +233,7 @@ def main():
               Ksteps=Ksteps,
               train_steps=train_steps[env],
               encode_dim=encode_dim,
-              hidden_layers=hidden_layers,
-              hidden_dim_alpha=hidden_dim_alpha,
+              hidden_layers=hidden_layers[env],
               cov_reg=cov_reg,
               gamma=0.8,
               seed=random_seed,
@@ -257,7 +243,7 @@ def main():
               lr_step=1000,
               lr_gamma=0.9,
               max_norm=0.1,
-              cov_reg_weight=1,
+              cov_reg_weight=cov_reg_weight,
               normalize=True,
               )
 
