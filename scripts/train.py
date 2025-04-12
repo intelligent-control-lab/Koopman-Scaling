@@ -205,7 +205,7 @@ def main():
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 100000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
     hidden_layers = {'G1': 1, 'Go2': 1, 'Kinova': 1, 'Franka': 2, 'DoublePendulum': 3,
-                     'DampingPendulum': 3, 'Polynomial': 5, 'LogisticMap': 7}
+                     'DampingPendulum': 4, 'Polynomial': 5, 'LogisticMap': 7}
     project_name = 'Koopman_Results_Apr_8'
 
     for random_seed, env, encode_dim, cov_reg in itertools.product(random_seeds, envs, encode_dims, cov_regs):
