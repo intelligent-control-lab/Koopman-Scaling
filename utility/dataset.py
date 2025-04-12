@@ -145,7 +145,7 @@ class DoublePendulumDataCollector:
         return data
 
 class DampingPendulumDataCollector:
-    def __init__(self, dt=0.02, L=1.0, g=9.81, damping=0.5):
+    def __init__(self, dt=0.025, L=1.0, g=9.81, damping=0.5):
         self.dt = dt
         self.L = L
         self.g = g
@@ -214,7 +214,6 @@ class FrankaDataCollector:
         self.joint_high = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9])
 
         self.sat_val = 0.35
-        #self.uval = 0.25
         
         self.state_dim = 17
         self.u_dim = 7
