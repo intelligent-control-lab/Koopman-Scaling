@@ -4,7 +4,7 @@ def gaussian_init_(n_units, std=1):
     sampler = torch.distributions.Normal(torch.Tensor([0]), torch.Tensor([std/n_units]))
     Omega = sampler.sample((n_units, n_units))[..., 0]  
     return Omega
-    
+
 class ResidualBlock(nn.Module):
     def __init__(self, in_features: int, out_features: int):
         super().__init__()
@@ -42,6 +42,8 @@ class KoopmanNet(nn.Module):
         self.lA.weight.data = gaussian_init_(Nkoopman, std=1)
         U, _, V = torch.svd(self.lA.weight.data)
         self.lA.weight.data = torch.mm(U, V.t()) * 0.9
+
+        nn.init.orthogonal_(self.encode_net[-1].linear.weight)
 
     def encode(self, x):
         return torch.cat([x, self.encode_net(x)], dim=-1)

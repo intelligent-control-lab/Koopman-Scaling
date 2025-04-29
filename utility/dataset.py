@@ -6,6 +6,9 @@ import pandas as pd
 import pybullet as pb
 import pybullet_data
 from tqdm import tqdm
+from scipy.integrate import odeint
+import random
+import gym
 
 class PolynomialDataCollector:
     def __init__(self, state_dim=3, m=100, a1=0.85, a2=0.9, a3=0.90, b=None):
@@ -193,6 +196,82 @@ class DoublePendulumDataCollector:
                 u = self.random_control()
                 s = self.simulate_dynamics(s, u)
                 data[t, traj, :] = np.concatenate([u, s])
+
+        return data
+
+class MountainCarContinuousDataCollector:
+    def __init__(self):
+        self.env_name = "MountainCarContinuous-v0"
+        self.env = gym.make(self.env_name)
+        self.state_dim = self.env.observation_space.shape[0]  # 2
+        self.u_dim = self.env.action_space.shape[0]           # 1
+        self.umin = self.env.action_space.low
+        self.umax = self.env.action_space.high
+
+    def reset_random_state(self):
+        # Randomize initial state for more diverse data
+        x0 = random.uniform(-0.1, 0.1)
+        dx0 = random.uniform(-0.5, 0.5)
+        state = np.array([x0, dx0])
+        self.env.reset()
+        self.env.state = state
+        return state
+
+    def collect_koopman_data(self, traj_num, steps):
+        data = np.empty((steps + 1, traj_num, self.u_dim + self.state_dim), dtype=np.float64)
+
+        for traj in range(traj_num):
+            s = self.reset_random_state()
+            u = np.random.uniform(self.umin, self.umax, size=self.u_dim)
+            data[0, traj, :] = np.concatenate([u, s])
+
+            for t in range(1, steps + 1):
+                s, _, terminated, truncated, _ = self.env.step(u)
+                done = terminated or truncated
+                u = np.random.uniform(self.umin, self.umax, size=self.u_dim)
+                data[t, traj, :] = np.concatenate([u, s])
+                if done:
+                    s = self.reset_random_state()
+
+        return data
+
+class CartPoleDataCollector:
+    def __init__(self):
+        self.env_name = "CartPole-v1"
+        self.env = gym.make(self.env_name)
+        self.state_dim = self.env.observation_space.shape[0]  # should be 4
+        self.u_dim = self.env.action_space.n                 # discrete actions (0 or 1)
+        self.umin = 0
+        self.umax = 1
+
+    def reset_random_state(self):
+        x0 = random.uniform(-4, 4)
+        dx0 = random.uniform(-8, 8)
+        th0 = random.uniform(-0.418, 0.418)
+        dth0 = random.uniform(-8, 8)
+        state = np.array([x0, dx0, th0, dth0])
+        self.env.reset()
+        self.env.state = state
+        return state
+
+    def collect_koopman_data(self, traj_num, steps):
+        data = np.empty((steps + 1, traj_num, self.u_dim + self.state_dim), dtype=np.float64)
+
+        for traj in range(traj_num):
+            s = self.reset_random_state()
+            u = random.randint(self.umin, self.umax)  # Discrete action
+            u_onehot = np.eye(self.u_dim)[u]  # One-hot encoding
+            data[0, traj, :] = np.concatenate([u_onehot, s])
+
+            for t in range(1, steps + 1):
+                s, _, terminated, truncated, _ = self.env.step(u)
+                done = terminated or truncated
+                u = random.randint(self.umin, self.umax)
+                u_onehot = np.eye(self.u_dim)[u]
+                data[t, traj, :] = np.concatenate([u_onehot, s])
+                if done:
+                    s = self.reset_random_state()  # Reset mid-trajectory if done
+                    self.env.state = s
 
         return data
 
@@ -403,6 +482,14 @@ class KoopmanDatasetCollector():
             self.u_dim = collector.u_dim
         elif env_name == "DampingPendulum":
             collector = DampingPendulumDataCollector()
+            self.state_dim = collector.state_dim
+            self.u_dim = collector.u_dim
+        elif env_name == "MountainCarContinuous":
+            collector = MountainCarContinuousDataCollector()
+            self.state_dim = collector.state_dim
+            self.u_dim = collector.u_dim
+        elif env_name == "CartPole":
+            collector = CartPoleDataCollector()
             self.state_dim = collector.state_dim
             self.u_dim = collector.u_dim
         elif env_name == "G1":
