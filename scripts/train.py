@@ -89,8 +89,8 @@ def cov_loss(z):
     return torch.norm(off_diag, p='fro')**2
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
-          train_steps=20000, encode_dim=16, hidden_layers=2, cov_reg=0, gamma=0.99, seed=42, batch_size=64, 
-          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, cov_reg_weight=1, normalize=False):
+          train_steps=20000, encode_dim=16, hidden_layers=2, gamma=0.99, seed=42, batch_size=64, 
+          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -136,13 +136,12 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
 
     wandb.init(project=project_name, 
-               name=f"{env_name}_edim{encode_dim}_closs{'on' if cov_reg else 'off'}_seed{seed}",
+               name=f"{env_name}_edim{encode_dim}_seed{seed}",
                config={
                     "env_name": env_name,
                     "train_steps": train_steps,
                     "encode_dim": encode_dim,
                     "hidden_layers": hidden_layers,
-                    "c_loss": cov_reg,
                     "gamma": gamma,
                     "Ktrain_samples": Ktrain_data.shape[1],
                     "Kval_samples": Kval_data.shape[1],
@@ -154,7 +153,6 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                     "lr_gamma": lr_gamma,
                     "batch_size": batch_size,
                     "max_norm": max_norm,
-                    "cov_reg_weight": cov_reg_weight,
                })
 
     best_loss = 1e10
@@ -173,16 +171,11 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
             Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device)
 
-            Closs = cov_loss(initial_encoding[:, state_dim:])
+            loss = Kloss
 
-            if cov_reg:
-                factor = initial_encoding[:, state_dim:].shape[1] * (initial_encoding[:, state_dim:].shape[1] - 1)
-                loss = Kloss + cov_reg_weight * Closs / factor
-            else:
-                loss = Kloss
-
-            if step % 1 == 0 and u_dim is not None:
-                loss += control_loss(X, net, mse_loss, u_dim, gamma, device)
+            if u_dim is not None:
+                Ctrlloss = control_loss(X, net, mse_loss, u_dim, gamma, device)
+                loss += Ctrlloss
 
             optimizer.zero_grad()
             loss.backward()
@@ -194,7 +187,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
             wandb.log({
                 "Train/Kloss": Kloss.item(),
-                "Train/CovLoss": Closs.item(),
+                "Train/ControlLoss": Ctrlloss.item() if u_dim is not None else 0,
                 "step": step
             })
 
@@ -206,14 +199,16 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                         Ctrlloss = control_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
                     else:
                         Ctrlloss = torch.zeros(1, dtype=torch.float32).to(device)
+                    
+                    loss_val = Kloss_val + Ctrlloss
 
-                    val_losses.append(Kloss_val.item())
+                    val_losses.append(loss_val.item())
 
-                    if Kloss_val < best_loss:
-                        best_loss = copy.copy(Kloss_val)
+                    if loss_val < best_loss:
+                        best_loss = copy.copy(loss_val)
                         best_state_dict = copy.copy(net.state_dict())
                         saved_dict = {'model':best_state_dict,'layer':layers}
-                        torch.save(saved_dict, f"../log/best_models/{project_name}/best_model_{norm_str}_{env_name}_{encode_dim}_{cov_reg}_{seed}.pth")
+                        torch.save(saved_dict, f"../log/best_models/{project_name}/best_model_{norm_str}_{env_name}_{encode_dim}_{seed}.pth")
 
                     wandb.log({
                         "Val/Kloss": Kloss_val.item(),
@@ -236,15 +231,15 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     wandb.finish()
 
 def main():
-    cov_regs = [0]#[0, 1]
     encode_dims = [1024]#[4, 16, 64, 256, 1024]
-    random_seeds = [1]#[1,2,3,4,5]
-    envs = ['Franka']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']
+    random_seeds = [1]
+    envs = ['CartPole', 'MountainCarContinuous', 'DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
-                   'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000}
-    project_name = 'Test_2'
+                   'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
+                   'MountainCarContinuous': 60000}
+    project_name = 'Koopman_Results_Apr_29'
 
-    for random_seed, env, encode_dim, cov_reg in itertools.product(random_seeds, envs, encode_dims, cov_regs):
+    for random_seed, env, encode_dim in itertools.product(random_seeds, envs, encode_dims):
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
@@ -254,7 +249,6 @@ def main():
               train_steps=train_steps[env],
               encode_dim=encode_dim,
               hidden_layers=3,
-              cov_reg=cov_reg,
               gamma=0.99,
               seed=random_seed,
               batch_size=64,
@@ -263,7 +257,6 @@ def main():
               lr_step=1000,
               lr_gamma=0.9,
               max_norm=0.1,
-              cov_reg_weight=1,
               normalize=True,
               )
 
