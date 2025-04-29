@@ -12,42 +12,73 @@ sys.path.append('../utility')
 from dataset import KoopmanDatasetCollector, KoopmanDataset
 from network import KoopmanNet
 
-def get_layers(input_dim, target_dim, depth=2, alpha=0.5):
-    base_width = max(int(alpha * (input_dim + target_dim)), 1)
+def get_layers(input_dim, target_dim, num_hidden_layers=1, hidden_dim=256):
     layers = [input_dim]
-    for i in range(depth):
-        layers.append(base_width)
+    for i in range(num_hidden_layers):
+        layers.append(hidden_dim)
     layers.append(target_dim)
     return layers
 
 def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
+    steps, traj_num, N = data.shape
+    state_dim = N if u_dim is None else N - u_dim
+
     if u_dim is None:
-        steps, traj_num, state_dim = data.shape
-        X_current = net.encode(data[0, :])
-        initial_encoding = X_current
-        beta = 1.0
-        beta_sum = 0.0
-        loss = torch.zeros(1, dtype=torch.float32).to(device)
-        for i in range(steps-1):
-            X_current = net.forward(X_current, None)
-            beta_sum += beta
-            loss += beta * mse_loss(X_current[:, :state_dim], data[i+1, :])
-            beta *= gamma
-        return loss / beta_sum, initial_encoding
-    
+        u_seq = None
+        X_gt = data[:, :, :]
+        X_encoded = net.encode(data[0])
+    else:
+        u_seq = data[:-1, :, :u_dim]
+        X_gt = data[1:, :, u_dim:]
+        X_encoded = net.encode(data[0, :, u_dim:])
+
+    initial_encoding = X_encoded
+    latent_seq = [X_encoded]
+
+    for i in range(steps - 1):
+        u_i = None if u_seq is None else u_seq[i]
+        X_encoded = net.forward(X_encoded, u_i)
+        latent_seq.append(X_encoded)
+
+    Z_pred = torch.stack(latent_seq, dim=0)
+
+    Z_pred = Z_pred[1:, :, :state_dim]
+
+    squared_error = (Z_pred - X_gt) ** 2
+    loss_per_step = squared_error.mean(dim=(1, 2))
+
+    betas = gamma ** torch.arange(steps - 1, device=device).float()
+    beta_sum = betas.sum()
+    weighted_loss = (loss_per_step * betas).sum()
+
+    return weighted_loss / beta_sum, initial_encoding
+
+def control_loss(data, net, mse_loss, u_dim, gamma, device):
     steps, traj_num, N = data.shape
     state_dim = N - u_dim
-    X_current = net.encode(data[0, :, u_dim:])
-    initial_encoding = X_current
-    beta = 1.0
-    beta_sum = 0.0
-    loss = torch.zeros(1, dtype=torch.float32).to(device)
-    for i in range(steps-1):
-        X_current = net.forward(X_current, data[i, :, :u_dim])
-        beta_sum += beta
-        loss += beta * mse_loss(X_current[:, :state_dim], data[i+1, :, u_dim:])
-        beta *= gamma
-    return loss / beta_sum, initial_encoding
+    A = net.lA.weight
+    B = net.lB.weight
+    B_pinv_T = torch.linalg.pinv(B).t()
+
+    betas = gamma ** torch.arange(steps - 1, device=device).float()
+    beta_sum = betas.sum()
+
+    encoded_states = net.encode(data[:, :, u_dim:])
+
+    X_i     = encoded_states[:-1]
+    X_ip1   = encoded_states[1:]
+    u       = data[:-1, :, :u_dim]
+
+    AX_i = torch.matmul(X_i, A.t())
+    residual = X_ip1 - AX_i
+
+    u_rec = torch.matmul(residual, B_pinv_T)
+
+    mse_elementwise = (u_rec - u) ** 2
+    loss_per_step = mse_elementwise.mean(dim=(1, 2))
+
+    weighted_loss = (loss_per_step * betas).sum()
+    return weighted_loss / beta_sum
 
 def cov_loss(z):
     z_mean = torch.mean(z, dim=0, keepdim=True)
@@ -150,6 +181,8 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             else:
                 loss = Kloss
 
+            if step % 1 == 0 and u_dim is not None:
+                loss += control_loss(X, net, mse_loss, u_dim, gamma, device)
 
             optimizer.zero_grad()
             loss.backward()
@@ -169,6 +202,10 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                 with torch.no_grad():
                     Kloss_val, initial_encoding = Klinear_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
                     Closs_val = cov_loss(initial_encoding[:, state_dim:])
+                    if u_dim is not None:
+                        Ctrlloss = control_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
+                    else:
+                        Ctrlloss = torch.zeros(1, dtype=torch.float32).to(device)
 
                     val_losses.append(Kloss_val.item())
 
@@ -181,7 +218,8 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                     wandb.log({
                         "Val/Kloss": Kloss_val.item(),
                         "Val/CovLoss": Closs_val.item(),
-                        "Val/best_Kloss": best_loss.item(),
+                        "Val/ControlLoss": Ctrlloss.item(),
+                        "Val/best_Kloss": best_loss.item() if torch.is_tensor(best_loss) else best_loss,
                         "step": step,
                     })
                     print("Step:{} Validation Kloss:{}".format(step, Kloss_val.item()))
@@ -198,38 +236,26 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     wandb.finish()
 
 def main():
-    cov_regs = [0, 1]
-    encode_dims = [4, 16, 64, 256, 1024]
-    random_seeds = [1,2,3,4,5]
-    envs = ['LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Polynomial', 'Kinova', 'G1', 'Go2']
-    train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 100000, 'Franka': 60000, 'DoublePendulum': 60000, 
-                   'DampingPendulum': 60000, 'Polynomial': 100000, 'LogisticMap': 100000}
-    hidden_layers = {'G1': 1, 'Go2': 1, 'Kinova': 1, 'Franka': 2, 'DoublePendulum': 3,
-                     'DampingPendulum': 4, 'Polynomial': 5, 'LogisticMap': 7}
-    project_name = 'Koopman_Results_Apr_8'
+    cov_regs = [0]#[0, 1]
+    encode_dims = [1024]#[4, 16, 64, 256, 1024]
+    random_seeds = [1]#[1,2,3,4,5]
+    envs = ['Franka']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']
+    train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
+                   'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000}
+    project_name = 'Test_2'
 
     for random_seed, env, encode_dim, cov_reg in itertools.product(random_seeds, envs, encode_dims, cov_regs):
-        if env == "Polynomial" or env == "LogisticMap":
-            Ksteps = 1
-        else:
-            Ksteps = 10
-
-        if env == "LogisticMap":
-            cov_reg_weight = 0.001
-        else:
-            cov_reg_weight = 1
-
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
               val_samples=20000,
               test_samples=20000,
-              Ksteps=Ksteps,
+              Ksteps=15,
               train_steps=train_steps[env],
               encode_dim=encode_dim,
-              hidden_layers=hidden_layers[env],
+              hidden_layers=3,
               cov_reg=cov_reg,
-              gamma=0.8,
+              gamma=0.99,
               seed=random_seed,
               batch_size=64,
               val_step=1000,
@@ -237,7 +263,7 @@ def main():
               lr_step=1000,
               lr_gamma=0.9,
               max_norm=0.1,
-              cov_reg_weight=cov_reg_weight,
+              cov_reg_weight=1,
               normalize=True,
               )
 
