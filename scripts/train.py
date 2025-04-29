@@ -25,7 +25,7 @@ def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
 
     if u_dim is None:
         u_seq = None
-        X_gt = data[:, :, :]
+        X_gt = data[1:, :, :]
         X_encoded = net.encode(data[0])
     else:
         u_seq = data[:-1, :, :u_dim]
@@ -171,11 +171,12 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
             Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device)
 
-            loss = Kloss
-
             if u_dim is not None:
                 Ctrlloss = control_loss(X, net, mse_loss, u_dim, gamma, device)
-                loss += Ctrlloss
+            else:
+                Ctrlloss = torch.zeros(1, dtype=torch.float32).to(device)
+
+            loss = Kloss + Ctrlloss
 
             optimizer.zero_grad()
             loss.backward()
@@ -196,11 +197,11 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                     Kloss_val, initial_encoding = Klinear_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
                     Closs_val = cov_loss(initial_encoding[:, state_dim:])
                     if u_dim is not None:
-                        Ctrlloss = control_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
+                        Ctrlloss_val = control_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
                     else:
-                        Ctrlloss = torch.zeros(1, dtype=torch.float32).to(device)
+                        Ctrlloss_val = torch.zeros(1, dtype=torch.float32).to(device)
                     
-                    loss_val = Kloss_val + Ctrlloss
+                    loss_val = Kloss_val #+ Ctrlloss_val
 
                     val_losses.append(loss_val.item())
 
@@ -213,7 +214,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                     wandb.log({
                         "Val/Kloss": Kloss_val.item(),
                         "Val/CovLoss": Closs_val.item(),
-                        "Val/ControlLoss": Ctrlloss.item(),
+                        "Val/ControlLoss": Ctrlloss_val.item(),
                         "Val/best_Kloss": best_loss.item() if torch.is_tensor(best_loss) else best_loss,
                         "step": step,
                     })
@@ -231,9 +232,9 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     wandb.finish()
 
 def main():
-    encode_dims = [1024]#[4, 16, 64, 256, 1024]
+    encode_dims = [4, 16, 64, 256, 1024]
     random_seeds = [1]
-    envs = ['CartPole', 'MountainCarContinuous', 'DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']
+    envs = ['DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
                    'MountainCarContinuous': 60000}
