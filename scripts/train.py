@@ -8,6 +8,8 @@ import wandb
 from torch.utils.data import DataLoader
 import os
 import sys
+import csv
+from datetime import datetime
 sys.path.append('../utility')
 from dataset import KoopmanDatasetCollector, KoopmanDataset
 from network import KoopmanNet
@@ -41,7 +43,6 @@ def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
         latent_seq.append(X_encoded)
 
     Z_pred = torch.stack(latent_seq, dim=0)
-
     Z_pred = Z_pred[1:, :, :state_dim]
 
     squared_error = (Z_pred - X_gt) ** 2
@@ -64,14 +65,12 @@ def control_loss(data, net, mse_loss, u_dim, gamma, device):
     beta_sum = betas.sum()
 
     encoded_states = net.encode(data[:, :, u_dim:])
-
     X_i     = encoded_states[:-1]
     X_ip1   = encoded_states[1:]
     u       = data[:-1, :, :u_dim]
 
     AX_i = torch.matmul(X_i, A.t())
     residual = X_ip1 - AX_i
-
     u_rec = torch.matmul(residual, B_pinv_T)
 
     mse_elementwise = (u_rec - u) ** 2
@@ -88,159 +87,154 @@ def cov_loss(z):
     off_diag = cov_matrix - diag_cov
     return torch.norm(off_diag, p='fro')**2
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+def log_to_csv(log_path, log_dict):
+    file_exists = os.path.isfile(log_path)
+    with open(log_path, mode='a', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=log_dict.keys())
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(log_dict)
+
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
-          train_steps=20000, encode_dim=16, hidden_layers=2, gamma=0.99, seed=42, batch_size=64, 
+          train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim=256, gamma=0.99, seed=42, batch_size=64, 
           initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    random.seed(seed)
-    np.random.seed(seed)
     torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-    norm_str = "norm" if normalize else "nonorm"
-
-    if not os.path.exists(f"../log/best_models/{project_name}/"):
-        os.makedirs(f"../log/best_models/{project_name}/")
-
-    print("Loading dataset...")
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    model_dir = f"../log/{project_name}/best_models/"
+    os.makedirs(model_dir, exist_ok=True)
+    csv_log_path = f"../log/{project_name}/koopman_results_log.csv"
 
     data_collector = KoopmanDatasetCollector(env_name, train_samples, val_samples, test_samples, Ksteps, normalize=normalize)
-    Ktrain_data, Kval_data, Ktest_data = data_collector.get_data()
-
-    Ktrain_data = torch.from_numpy(Ktrain_data).float()
-    Kval_data = torch.from_numpy(Kval_data).float()
+    Ktrain_data, Kval_data, Ktest_data = map(lambda x: torch.from_numpy(x).float(), data_collector.get_data())
 
     u_dim = data_collector.u_dim
     state_dim = data_collector.state_dim
-
-    print("u_dim:", u_dim)
-    print("state_dim:", state_dim)
-
-    print("Train data shape:", Ktrain_data.shape)
-    print("Validation data shape:", Kval_data.shape)
-
-    layers = get_layers(state_dim, encode_dim, hidden_layers)
+    layers = get_layers(state_dim, encode_dim, hidden_layers, hidden_dim)
     Nkoopman = state_dim + encode_dim
 
+    print('Environment:', env_name)
+    print("u_dim:", u_dim)
+    print("state_dim:", state_dim)
+    print("Train data shape:", Ktrain_data.shape)
+    print("Validation data shape:", Kval_data.shape)
+    print("Test data shape:", Ktest_data.shape)
     print("Encoder layers:", layers)
 
-    net = KoopmanNet(layers, Nkoopman, u_dim)
-    net.to(device)
+    net = KoopmanNet(layers, Nkoopman, u_dim).to(device)
     mse_loss = nn.MSELoss()
-
     optimizer = torch.optim.Adam(net.parameters(), lr=initial_lr)
-
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
 
-    wandb.init(project=project_name, 
-               name=f"{env_name}_edim{encode_dim}_seed{seed}",
-               config={
-                    "env_name": env_name,
-                    "train_steps": train_steps,
-                    "encode_dim": encode_dim,
-                    "hidden_layers": hidden_layers,
-                    "gamma": gamma,
-                    "Ktrain_samples": Ktrain_data.shape[1],
-                    "Kval_samples": Kval_data.shape[1],
-                    "Ktest_samples": Ktest_data.shape[1],
-                    "Ksteps": Ktrain_data.shape[0],
-                    "seed": seed,
-                    "initial_lr": initial_lr,
-                    "lr_step": lr_step,
-                    "lr_gamma": lr_gamma,
-                    "batch_size": batch_size,
-                    "max_norm": max_norm,
-               })
+    wandb.init(project=project_name,
+               name=f"{env_name}_edim{encode_dim}_layer_{hidden_layers}_hidden_{hidden_dim}_seed{seed}",
+               config=locals())
 
     best_loss = 1e10
-    step = 0
     val_losses = []
-
-    train_dataset = KoopmanDataset(Ktrain_data)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    train_loader = DataLoader(KoopmanDataset(Ktrain_data), batch_size=batch_size, shuffle=True, pin_memory=True)
     Kval_data = Kval_data.to(device)
+    Ktest_data = Ktest_data.to(device)
+    step = 0
+
+    best_model_path = None
 
     while step < train_steps:
         for batch in train_loader:
             if step >= train_steps:
                 break
             X = batch.permute(1, 0, 2).to(device)
-
             Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device)
-
-            if u_dim is not None:
-                Ctrlloss = control_loss(X, net, mse_loss, u_dim, gamma, device)
-            else:
-                Ctrlloss = torch.zeros(1, dtype=torch.float32).to(device)
-
+            Ctrlloss = control_loss(X, net, mse_loss, u_dim, gamma, device) if u_dim else torch.zeros(1, device=device)
             loss = Kloss + Ctrlloss
 
             optimizer.zero_grad()
             loss.backward()
-
             nn.utils.clip_grad_norm_(net.parameters(), max_norm)
-
             optimizer.step()
             scheduler.step()
 
-            wandb.log({
-                "Train/Kloss": Kloss.item(),
-                "Train/ControlLoss": Ctrlloss.item() if u_dim is not None else 0,
-                "step": step
-            })
+            wandb.log({"Train/Kloss": Kloss.item(), "Train/ControlLoss": Ctrlloss.item(), "step": step})
 
             if step % val_step == 0:
                 with torch.no_grad():
                     Kloss_val, initial_encoding = Klinear_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
+                    Ctrlloss_val = control_loss(Kval_data, net, mse_loss, u_dim, gamma, device) if u_dim else torch.zeros(1, device=device)
                     Closs_val = cov_loss(initial_encoding[:, state_dim:])
-                    if u_dim is not None:
-                        Ctrlloss_val = control_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
-                    else:
-                        Ctrlloss_val = torch.zeros(1, dtype=torch.float32).to(device)
-                    
-                    loss_val = Kloss_val #+ Ctrlloss_val
+                    val_loss = Kloss_val
 
-                    val_losses.append(loss_val.item())
+                    if val_loss < best_loss:
+                        best_loss = val_loss
+                        best_state_dict = copy.deepcopy(net.state_dict())
+                        best_model_path = os.path.join(model_dir, f"{timestamp}_model_{env_name}.pth")
+                        torch.save({'model': best_state_dict, 'layer': layers}, best_model_path)
 
-                    if loss_val < best_loss:
-                        best_loss = copy.copy(loss_val)
-                        best_state_dict = copy.copy(net.state_dict())
-                        saved_dict = {'model':best_state_dict,'layer':layers}
-                        torch.save(saved_dict, f"../log/best_models/{project_name}/best_model_{norm_str}_{env_name}_{encode_dim}_{seed}.pth")
-
+                    val_losses.append(val_loss.item())
                     wandb.log({
                         "Val/Kloss": Kloss_val.item(),
-                        "Val/CovLoss": Closs_val.item(),
                         "Val/ControlLoss": Ctrlloss_val.item(),
-                        "Val/best_Kloss": best_loss.item() if torch.is_tensor(best_loss) else best_loss,
-                        "step": step,
+                        "Val/CovLoss": Closs_val.item(),
+                        "Val/best_Kloss": best_loss.item(),
+                        "step": step
                     })
-                    print("Step:{} Validation Kloss:{}".format(step, Kloss_val.item()))
+                    print(f"Step {step}: Val Kloss: {Kloss_val.item()}")
 
             step += 1
 
-    if len(val_losses) >= 10:
-        convergence_loss = np.mean(val_losses[-10:])
-    else:
-        convergence_loss = np.mean(val_losses) if len(val_losses) > 0 else None
-
-    print("END - Best loss: {}  Convergence loss: {}".format(best_loss.item(), convergence_loss))
+        convergence_loss = np.mean(val_losses[-10:]) if len(val_losses) >= 10 else np.mean(val_losses)
     wandb.log({"best_loss": best_loss.item(), "convergence_loss": convergence_loss})
+
+    assert best_model_path is not None and os.path.exists(best_model_path), "Best model not saved properly."
+    checkpoint = torch.load(best_model_path, map_location=device)
+    net.load_state_dict(checkpoint['model'])
+    net.eval()
+
+    with torch.no_grad():
+        Ktest_loss, encoding_test = Klinear_loss(Ktest_data, net, mse_loss, u_dim, gamma, device)
+        if u_dim is not None:
+            Ctest_loss = control_loss(Ktest_data, net, mse_loss, u_dim, gamma, device)
+        Ctest_cov = cov_loss(encoding_test[:, state_dim:])
+
+    log_to_csv(csv_log_path, {
+        "env_name": env_name,
+        "encode_dim": encode_dim,
+        "hidden_layers": hidden_layers,
+        "hidden_dim": hidden_dim,
+        "seed": seed,
+        "normalize": normalize,
+        "best_val_Kloss": best_loss.item(),
+        "convergence_val_Kloss": convergence_loss,
+        "test_Kloss": Ktest_loss.item(),
+        "test_CovLoss": Ctest_cov.item(),
+        "test_ControlLoss": Ctest_loss.item() if u_dim is not None else np.nan,
+        "model_path": best_model_path,
+        "num_params": count_parameters(net),
+        "encoder_num_params": count_parameters(net.encode_net),
+    })
+
     wandb.finish()
 
 def main():
     encode_dims = [4, 16, 64, 256, 1024]
+    layer_depths = [1, 2, 3, 4, 5]
+    hidden_dims = [4, 16, 64, 256, 1024]
     random_seeds = [1]
-    envs = ['G1', 'Go2']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']
+    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
                    'MountainCarContinuous': 60000}
-    project_name = 'Koopman_Results_Apr_29'
+    project_name = 'Apr_30'
 
-    for random_seed, env, encode_dim in itertools.product(random_seeds, envs, encode_dims):
+    for random_seed, env, encode_dim, layer_depth, hidden_dim in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims):
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
@@ -249,7 +243,8 @@ def main():
               Ksteps=15,
               train_steps=train_steps[env],
               encode_dim=encode_dim,
-              hidden_layers=3,
+              hidden_layers=layer_depth,
+              hidden_dim=hidden_dim,
               gamma=0.99,
               seed=random_seed,
               batch_size=64,
