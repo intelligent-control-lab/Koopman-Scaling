@@ -114,7 +114,7 @@ class DampingPendulumDataCollector:
         data = np.empty((steps + 1, traj_num, self.state_dim + self.u_dim),
                         dtype=np.float64)
 
-        for traj in range(traj_num):
+        for traj in tqdm(range(traj_num)):
             s = self.random_state()
             u = self.random_control()
             data[0, traj, :] = np.concatenate([u, s])
@@ -187,7 +187,7 @@ class DoublePendulumDataCollector:
         data = np.empty((steps + 1, traj_num, self.state_dim + self.u_dim),
                         dtype=np.float64)
 
-        for traj in range(traj_num):
+        for traj in tqdm(range(traj_num)):
             s = self.random_state()
             u = self.random_control()
             data[0, traj, :] = np.concatenate([u, s])
@@ -386,18 +386,18 @@ class G1Go2DataCollector():
             g1_tracking_path_5 = '2025-03-24-04-01-44_trajnum30000_trajlen15'
             try:
                 if env_name == 'Go2':
-                    tracking_dataset_path_0 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_0}.npz"
-                    tracking_dataset_path_1 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_1}.npz"
-                    tracking_dataset_path_2 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_2}.npz"
-                    tracking_dataset_path_3 = f"../data/datasets/unitree_go2_flat/tracking_dataset/{go2_tracking_path_3}.npz"
+                    tracking_dataset_path_0 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_0}.npz"
+                    tracking_dataset_path_1 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_1}.npz"
+                    tracking_dataset_path_2 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_2}.npz"
+                    tracking_dataset_path_3 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_3}.npz"
                     self.data_pathes = [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3]
                 elif env_name == 'G1':
-                    tracking_dataset_path_0 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_0}.npz"
-                    tracking_dataset_path_1 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_1}.npz"
-                    tracking_dataset_path_2 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_2}.npz"
-                    tracking_dataset_path_3 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_3}.npz"
-                    tracking_dataset_path_4 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_4}.npz"
-                    tracking_dataset_path_5 = f"../data/datasets/g1_flat/tracking_dataset/{g1_tracking_path_5}.npz"
+                    tracking_dataset_path_0 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_0}.npz"
+                    tracking_dataset_path_1 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_1}.npz"
+                    tracking_dataset_path_2 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_2}.npz"
+                    tracking_dataset_path_3 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_3}.npz"
+                    tracking_dataset_path_4 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_4}.npz"
+                    tracking_dataset_path_5 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_5}.npz"
                     self.data_pathes = [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3, tracking_dataset_path_4, tracking_dataset_path_5]
             except:
                 raise ValueError("Dataset not found for the given environment.")

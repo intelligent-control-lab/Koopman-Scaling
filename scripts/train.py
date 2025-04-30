@@ -234,7 +234,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 def main():
     encode_dims = [4, 16, 64, 256, 1024]
     random_seeds = [1]
-    envs = ['DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']
+    envs = ['G1', 'Go2']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Kinova', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
                    'MountainCarContinuous': 60000}
