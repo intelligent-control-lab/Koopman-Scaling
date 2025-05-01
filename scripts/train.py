@@ -100,7 +100,7 @@ def log_to_csv(log_path, log_dict):
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
           train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim=256, gamma=0.99, seed=42, batch_size=64, 
-          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False):
+          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False, use_residual=True):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(seed)
@@ -130,7 +130,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     print("Test data shape:", Ktest_data.shape)
     print("Encoder layers:", layers)
 
-    net = KoopmanNet(layers, Nkoopman, u_dim).to(device)
+    net = KoopmanNet(layers, Nkoopman, u_dim, use_residual=use_residual).to(device)
     mse_loss = nn.MSELoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=initial_lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
@@ -254,6 +254,7 @@ def main():
               lr_gamma=0.9,
               max_norm=0.1,
               normalize=True,
+              use_residual=True
               )
 
 if __name__ == "__main__":
