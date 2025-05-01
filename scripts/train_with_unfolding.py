@@ -14,11 +14,13 @@ sys.path.append('../utility')
 from dataset import KoopmanDatasetCollector, KoopmanDataset
 from network import KoopmanNet
 
-def get_layers(input_dim, target_dim, num_hidden_layers=1, hidden_dim=256):
+def get_doubling_layers(input_dim, target_dim):
     layers = [input_dim]
-    for i in range(num_hidden_layers):
-        layers.append(hidden_dim)
-    layers.append(target_dim)
+    while layers[-1] < target_dim:
+        next_width = layers[-1] * 2
+        if next_width > target_dim:
+            next_width = target_dim
+        layers.append(next_width)
     return layers
 
 def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
@@ -99,8 +101,8 @@ def log_to_csv(log_path, log_dict):
         writer.writerow(log_dict)
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
-          train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim=256, gamma=0.99, seed=42, batch_size=64, 
-          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False, use_residual=True):
+          train_steps=20000, encode_dim=16, gamma=0.99, seed=42, batch_size=64, initial_lr=1e-3, lr_step=1000, 
+          lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False, use_residual=True, cov_reg=True, cov_reg_weight=1):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(seed)
@@ -119,7 +121,8 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
     u_dim = data_collector.u_dim
     state_dim = data_collector.state_dim
-    layers = get_layers(state_dim, encode_dim, hidden_layers, hidden_dim)
+    layers = get_doubling_layers(state_dim, encode_dim)
+
     Nkoopman = state_dim + encode_dim
 
     print('Environment:', env_name)
@@ -136,7 +139,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
 
     wandb.init(project=project_name,
-               name=f"{env_name}_edim{encode_dim}_layer_{hidden_layers}_hidden_{hidden_dim}_seed{seed}",
+               name=f"{env_name}_edim{encode_dim}_covreg_{cov_reg}_seed{seed}",
                config=locals())
 
     best_loss = 1e10
@@ -155,7 +158,10 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             X = batch.permute(1, 0, 2).to(device)
             Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device)
             Ctrlloss = control_loss(X, net, mse_loss, u_dim, gamma, device) if u_dim else torch.zeros(1, device=device)
+            Covloss = cov_loss(initial_encoding[:, state_dim:]) if cov_reg else torch.zeros(1, device=device)
             loss = Kloss + Ctrlloss
+            if cov_reg:
+                loss += cov_reg_weight * Covloss / (initial_encoding[:, state_dim:].shape[1] * (initial_encoding[:, state_dim:].shape[1] - 1))
 
             optimizer.zero_grad()
             loss.backward()
@@ -163,13 +169,16 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             optimizer.step()
             scheduler.step()
 
-            wandb.log({"Train/Kloss": Kloss.item(), "Train/ControlLoss": Ctrlloss.item(), "step": step})
+            wandb.log({"Train/Kloss": Kloss.item(), 
+                        "Train/ControlLoss": Ctrlloss.item(), 
+                        "Train/CovLoss": Covloss.item(),
+                        "step": step})
 
             if step % val_step == 0:
                 with torch.no_grad():
                     Kloss_val, initial_encoding = Klinear_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
                     Ctrlloss_val = control_loss(Kval_data, net, mse_loss, u_dim, gamma, device) if u_dim else torch.zeros(1, device=device)
-                    Closs_val = cov_loss(initial_encoding[:, state_dim:])
+                    Covloss_val = cov_loss(initial_encoding[:, state_dim:])
                     val_loss = Kloss_val
 
                     if val_loss < best_loss:
@@ -182,7 +191,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
                     wandb.log({
                         "Val/Kloss": Kloss_val.item(),
                         "Val/ControlLoss": Ctrlloss_val.item(),
-                        "Val/CovLoss": Closs_val.item(),
+                        "Val/CovLoss": Covloss_val.item(),
                         "Val/best_Kloss": best_loss.item(),
                         "step": step
                     })
@@ -207,8 +216,8 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     log_to_csv(csv_log_path, {
         "env_name": env_name,
         "encode_dim": encode_dim,
-        "hidden_layers": hidden_layers,
-        "hidden_dim": hidden_dim,
+        "cov_reg": cov_reg,
+        "cov_reg_weight": cov_reg_weight,
         "seed": seed,
         "normalize": normalize,
         "best_val_Kloss": best_loss.item(),
@@ -225,16 +234,15 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
 def main():
     encode_dims = [4, 16, 64, 256, 1024]
-    layer_depths = [1, 2, 3, 4, 5]
-    hidden_dims = [4, 16, 64, 256, 1024]
+    cov_regs = [True, False]
     random_seeds = [1]
     envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
                    'MountainCarContinuous': 60000}
-    project_name = 'Apr_30'
+    project_name = 'May_1_Unfolding_CovReg'
 
-    for random_seed, env, encode_dim, layer_depth, hidden_dim in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims):
+    for random_seed, env, encode_dim, cov_reg in itertools.product(random_seeds, envs, encode_dims, cov_regs):
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
@@ -243,8 +251,8 @@ def main():
               Ksteps=15,
               train_steps=train_steps[env],
               encode_dim=encode_dim,
-              hidden_layers=layer_depth,
-              hidden_dim=hidden_dim,
+              cov_reg=cov_reg,
+              cov_reg_weight=1,
               gamma=0.99,
               seed=random_seed,
               batch_size=64,
