@@ -21,6 +21,8 @@ def get_doubling_layers(input_dim, target_dim):
         if next_width > target_dim:
             next_width = target_dim
         layers.append(next_width)
+    if len(layers) == 1:
+        layers.append(target_dim)
     return layers
 
 def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
@@ -234,15 +236,16 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
 def main():
     encode_dims = [4, 16, 64, 256, 1024]
-    cov_regs = [True, False]
-    random_seeds = [1]
+    cov_reg_weights = [0.001, 0.01, 0.1, 1, 10, 100, 1000]
+    cov_regs = [True]
+    random_seeds = [2,3,4,5]
     envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
                    'MountainCarContinuous': 60000}
-    project_name = 'May_1_Unfolding_CovReg'
+    project_name = 'May_2_Unfolding_CovReg'
 
-    for random_seed, env, encode_dim, cov_reg in itertools.product(random_seeds, envs, encode_dims, cov_regs):
+    for random_seed, env, encode_dim, cov_reg, cov_reg_weight in itertools.product(random_seeds, envs, encode_dims, cov_regs, cov_reg_weights):
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
@@ -252,7 +255,7 @@ def main():
               train_steps=train_steps[env],
               encode_dim=encode_dim,
               cov_reg=cov_reg,
-              cov_reg_weight=1,
+              cov_reg_weight=cov_reg_weight,
               gamma=0.99,
               seed=random_seed,
               batch_size=64,
