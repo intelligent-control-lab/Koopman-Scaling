@@ -224,17 +224,18 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     wandb.finish()
 
 def main():
-    encode_dims = [4, 16, 64, 256, 1024]
-    layer_depths = [1, 2, 3, 4, 5]
-    hidden_dims = [4, 16, 64, 256, 1024]
+    encode_dims = [64]#[4, 16, 64, 256, 1024]
+    layer_depths = [3]#[1, 2, 3, 4, 5]
+    hidden_dims = [256]#[4, 16, 64, 256, 1024]
+    residuals = [True, False]
     random_seeds = [1]
     envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
                    'MountainCarContinuous': 60000}
-    project_name = 'Apr_30'
+    project_name = 'May_3_residual'
 
-    for random_seed, env, encode_dim, layer_depth, hidden_dim in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims):
+    for random_seed, env, encode_dim, layer_depth, hidden_dim, residual in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals):
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
@@ -254,7 +255,7 @@ def main():
               lr_gamma=0.9,
               max_norm=0.1,
               normalize=True,
-              use_residual=True
+              use_residual=residual
               )
 
 if __name__ == "__main__":
