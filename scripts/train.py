@@ -100,7 +100,8 @@ def log_to_csv(log_path, log_dict):
 
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
           train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim=256, gamma=0.99, seed=42, batch_size=64, 
-          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False, use_residual=True):
+          initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False, use_residual=True,
+          use_control_loss=True):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(seed)
@@ -155,7 +156,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             X = batch.permute(1, 0, 2).to(device)
             Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device)
             Ctrlloss = control_loss(X, net, mse_loss, u_dim, gamma, device) if u_dim else torch.zeros(1, device=device)
-            loss = Kloss + Ctrlloss
+            loss = Kloss + Ctrlloss if use_control_loss else Kloss
 
             optimizer.zero_grad()
             loss.backward()
@@ -206,6 +207,22 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
     log_to_csv(csv_log_path, {
         "env_name": env_name,
+        "state_dim": state_dim,
+        "u_dim": u_dim,
+        "train_samples": train_samples,
+        "val_samples": val_samples,
+        "test_samples": test_samples,
+        "Ksteps": Ksteps,
+        "train_steps": train_steps,
+        "batch_size": batch_size,
+        "initial_lr": initial_lr,
+        "lr_step": lr_step,
+        "lr_gamma": lr_gamma,
+        "max_norm": max_norm,
+        "val_step": val_step,
+        "gamma": gamma,
+        "use_residual": use_residual,
+        "use_control_loss": use_control_loss,
         "encode_dim": encode_dim,
         "hidden_layers": hidden_layers,
         "hidden_dim": hidden_dim,
@@ -218,7 +235,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
         "test_ControlLoss": Ctest_loss.item() if u_dim is not None else np.nan,
         "model_path": best_model_path,
         "num_params": count_parameters(net),
-        "encoder_num_params": count_parameters(net.encode_net),
+        "encoder_num_params": count_parameters(net.encode_net)
     })
 
     wandb.finish()
@@ -227,15 +244,16 @@ def main():
     encode_dims = [64]#[4, 16, 64, 256, 1024]
     layer_depths = [3]#[1, 2, 3, 4, 5]
     hidden_dims = [256]#[4, 16, 64, 256, 1024]
-    residuals = [True, False]
+    residuals = [True]
+    control_losses = [True, False]
     random_seeds = [1]
-    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
+    envs = ['DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
                    'MountainCarContinuous': 60000}
-    project_name = 'May_3_residual'
+    project_name = 'May_6_control_loss'
 
-    for random_seed, env, encode_dim, layer_depth, hidden_dim, residual in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals):
+    for random_seed, env, encode_dim, layer_depth, hidden_dim, residual, control_loss in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals, control_losses):
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
@@ -255,7 +273,8 @@ def main():
               lr_gamma=0.9,
               max_norm=0.1,
               normalize=True,
-              use_residual=residual
+              use_residual=residual,
+              use_control_loss=control_loss
               )
 
 if __name__ == "__main__":
