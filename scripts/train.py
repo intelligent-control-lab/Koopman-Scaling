@@ -21,7 +21,7 @@ def get_layers(input_dim, target_dim, num_hidden_layers=1, hidden_dim=256):
     layers.append(target_dim)
     return layers
 
-def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
+def Klinear_loss(data, net, mse_loss, u_dim, gamma, device, all_loss=False):
     steps, traj_num, N = data.shape
     state_dim = N if u_dim is None else N - u_dim
 
@@ -35,24 +35,25 @@ def Klinear_loss(data, net, mse_loss, u_dim, gamma, device):
         X_encoded = net.encode(data[0, :, u_dim:])
 
     initial_encoding = X_encoded
-    latent_seq = [X_encoded]
+    beta = 1.0
+    beta_sum = 0.0
+    loss = torch.zeros(1, dtype=torch.float64, device=device)
 
     for i in range(steps - 1):
         u_i = None if u_seq is None else u_seq[i]
         X_encoded = net.forward(X_encoded, u_i)
-        latent_seq.append(X_encoded)
 
-    Z_pred = torch.stack(latent_seq, dim=0)
-    Z_pred = Z_pred[1:, :, :state_dim]
+        beta_sum += beta
+        if not all_loss:
+            target = X_gt[i]
+        else:
+            target = net.encode(data[i + 1, :, u_dim:]) if u_dim is not None else net.encode(data[i + 1, :, :])
 
-    squared_error = (Z_pred - X_gt) ** 2
-    loss_per_step = squared_error.mean(dim=(1, 2))
+        loss += beta * mse_loss(X_encoded[:, :state_dim], target[:, :state_dim])
+        beta *= gamma
 
-    betas = gamma ** torch.arange(steps - 1, device=device).float()
-    beta_sum = betas.sum()
-    weighted_loss = (loss_per_step * betas).sum()
-
-    return weighted_loss / beta_sum, initial_encoding
+    loss /= beta_sum
+    return loss, initial_encoding
 
 def control_loss(data, net, mse_loss, u_dim, gamma, device):
     steps, traj_num, N = data.shape
@@ -101,7 +102,7 @@ def log_to_csv(log_path, log_dict):
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
           train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim=256, gamma=0.99, seed=42, batch_size=64, 
           initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False, use_residual=True,
-          use_control_loss=True):
+          use_control_loss=True, use_covariance_loss=False, cov_loss_weight=1, all_loss=False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(seed)
@@ -154,9 +155,11 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             if step >= train_steps:
                 break
             X = batch.permute(1, 0, 2).to(device)
-            Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device)
+            Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device, all_loss=all_loss)
             Ctrlloss = control_loss(X, net, mse_loss, u_dim, gamma, device) if u_dim else torch.zeros(1, device=device)
+            Closs = cov_loss(initial_encoding[:, state_dim:])
             loss = Kloss + Ctrlloss if use_control_loss else Kloss
+            loss = loss + cov_loss_weight * Closs / (initial_encoding[:, state_dim:].shape[1] * (initial_encoding[:, state_dim:].shape[1] - 1)) if use_covariance_loss else loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -168,9 +171,9 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
             if step % val_step == 0:
                 with torch.no_grad():
-                    Kloss_val, initial_encoding = Klinear_loss(Kval_data, net, mse_loss, u_dim, gamma, device)
+                    Kloss_val, initial_encoding_val = Klinear_loss(Kval_data, net, mse_loss, u_dim, gamma, device, all_loss=all_loss)
                     Ctrlloss_val = control_loss(Kval_data, net, mse_loss, u_dim, gamma, device) if u_dim else torch.zeros(1, device=device)
-                    Closs_val = cov_loss(initial_encoding[:, state_dim:])
+                    Closs_val = cov_loss(initial_encoding_val[:, state_dim:])
                     val_loss = Kloss_val
 
                     if val_loss < best_loss:
@@ -200,7 +203,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     net.eval()
 
     with torch.no_grad():
-        Ktest_loss, encoding_test = Klinear_loss(Ktest_data, net, mse_loss, u_dim, gamma, device)
+        Ktest_loss, encoding_test = Klinear_loss(Ktest_data, net, mse_loss, u_dim, gamma, device, all_loss=all_loss)
         if u_dim is not None:
             Ctest_loss = control_loss(Ktest_data, net, mse_loss, u_dim, gamma, device)
         Ctest_cov = cov_loss(encoding_test[:, state_dim:])
@@ -223,6 +226,9 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
         "gamma": gamma,
         "use_residual": use_residual,
         "use_control_loss": use_control_loss,
+        "use_covariance_loss": use_covariance_loss,
+        "cov_loss_weight": cov_loss_weight,
+        "all_loss": all_loss,
         "encode_dim": encode_dim,
         "hidden_layers": hidden_layers,
         "hidden_dim": hidden_dim,
@@ -241,19 +247,20 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     wandb.finish()
 
 def main():
-    encode_dims = [64]#[4, 16, 64, 256, 1024]
+    encode_dims = [4, 16, 64, 256, 1024]
     layer_depths = [3]#[1, 2, 3, 4, 5]
     hidden_dims = [256]#[4, 16, 64, 256, 1024]
     residuals = [True]
     control_losses = [True, False]
+    covariance_losses = [False]
     random_seeds = [1]
     envs = ['DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
     train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
                    'MountainCarContinuous': 60000}
-    project_name = 'May_6_control_loss'
+    project_name = 'May_7_control_loss'
 
-    for random_seed, env, encode_dim, layer_depth, hidden_dim, residual, control_loss in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals, control_losses):
+    for random_seed, env, encode_dim, layer_depth, hidden_dim, residual, control_loss, covariance_loss in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals, control_losses, covariance_losses):
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
@@ -274,7 +281,10 @@ def main():
               max_norm=0.1,
               normalize=True,
               use_residual=residual,
-              use_control_loss=control_loss
+              use_control_loss=control_loss,
+              use_covariance_loss=covariance_loss,
+              cov_loss_weight=1,
+              all_loss=False
               )
 
 if __name__ == "__main__":
