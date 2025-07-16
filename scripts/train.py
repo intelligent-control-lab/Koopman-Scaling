@@ -102,7 +102,7 @@ def log_to_csv(log_path, log_dict):
 def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
           train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim=256, gamma=0.99, seed=42, batch_size=64, 
           initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False, use_residual=True,
-          use_control_loss=True, use_covariance_loss=False, cov_loss_weight=1, all_loss=False):
+          use_control_loss=True, use_covariance_loss=False, cov_loss_weight=1, ctrl_loss_weight=1, all_loss=False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(seed)
@@ -158,7 +158,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
             Kloss, initial_encoding = Klinear_loss(X, net, mse_loss, u_dim, gamma, device, all_loss=all_loss)
             Ctrlloss = control_loss(X, net, mse_loss, u_dim, gamma, device) if u_dim else torch.zeros(1, device=device)
             Closs = cov_loss(initial_encoding[:, state_dim:])
-            loss = Kloss + Ctrlloss if use_control_loss else Kloss
+            loss = Kloss + ctrl_loss_weight * Ctrlloss if use_control_loss else Kloss
             loss = loss + cov_loss_weight * Closs / (initial_encoding[:, state_dim:].shape[1] * (initial_encoding[:, state_dim:].shape[1] - 1)) if use_covariance_loss else loss
 
             optimizer.zero_grad()
@@ -251,22 +251,30 @@ def main():
     layer_depths = [3]#[1, 2, 3, 4, 5]
     hidden_dims = [256]#[4, 16, 64, 256, 1024]
     residuals = [True]
-    control_losses = [True, False]
-    covariance_losses = [False]
+    control_losses = [False, True]
+    ctrl_loss_weights = [1]
+    covariance_losses = [False, True]
+    cov_loss_weights = [1]
     random_seeds = [1]
-    envs = ['DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']#['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
-    train_steps = {'G1': 20000, 'Go2': 20000, 'Kinova': 60000, 'Franka': 60000, 'DoublePendulum': 60000, 
-                   'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'CartPole': 60000,
-                   'MountainCarContinuous': 60000}
-    project_name = 'May_7_control_loss'
+    envs = ['Polynomial', 'LogisticMap', 'DampingPendulum', 'DoublePendulum', 'Franka', 'G1', 'Go2']
+    train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000, 
+                   'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000}
+    project_name = 'Jul_16_pendulum_3'
 
-    for random_seed, env, encode_dim, layer_depth, hidden_dim, residual, control_loss, covariance_loss in itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals, control_losses, covariance_losses):
+    for random_seed, env, encode_dim, layer_depth, hidden_dim, residual, control_loss, covariance_loss, ctrl_loss_weight, cov_loss_weight in \
+    itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals, control_losses, covariance_losses, ctrl_loss_weights, cov_loss_weights):
+        if env == 'Polynomial' or env == 'LogisticMap':
+            Ksteps = 1
+            if control_loss:
+                continue
+        else:
+            Ksteps = 15
         train(project_name=project_name,
               env_name=env,
               train_samples=60000,
               val_samples=20000,
               test_samples=20000,
-              Ksteps=15,
+              Ksteps=Ksteps,
               train_steps=train_steps[env],
               encode_dim=encode_dim,
               hidden_layers=layer_depth,
@@ -279,11 +287,12 @@ def main():
               lr_step=1000,
               lr_gamma=0.9,
               max_norm=0.1,
-              normalize=True,
+              normalize=False,
               use_residual=residual,
               use_control_loss=control_loss,
               use_covariance_loss=covariance_loss,
-              cov_loss_weight=1,
+              cov_loss_weight=cov_loss_weight,
+              ctrl_loss_weight=ctrl_loss_weight,
               all_loss=False
               )
 
