@@ -378,18 +378,62 @@ class KinovaDataCollector():
     def collect_koopman_data(self, traj_num, steps):
         return self.get_data(self.data_pathes, steps)[:, :traj_num, :]
 
+def trim_robot_states(env_name, state_data, action_data):
+    """
+    Trim robot states to exclude hands and extract relevant components.
+    Based on the original mpc_tracking.py logic.
+    """
+    if env_name == "G1":
+        # G1: Extract [joint_pos[:23], joint_vel[37:60], height[76:77], root_state[81:]]
+        # joint_pos: first 23 DOFs (exclude hands)
+        # joint_vel: positions 37-59 (23 velocities corresponding to first 23 positions)
+        # height: position 76 (z-coordinate)  
+        # root_state: positions 81-86 (6D root state: lin_vel[3] + ang_vel[3])
+        trimmed_states = np.concatenate([
+            state_data[..., :23],        # joint positions (23)
+            state_data[..., 37:60],      # joint velocities (23)  
+            state_data[..., 76:77],      # height (1)
+            state_data[..., 81:]         # root state (6)
+        ], axis=-1)
+        # G1: Use first 23 actions (exclude hand actions)
+        trimmed_actions = action_data[..., :23]
+        
+    elif env_name == "Go2":
+        # Go2: Extract [joint_states[:24], root_states[26:]]
+        # joint_states: positions 0-23 (12 pos + 12 vel)
+        # root_states: positions 26+ (remaining root state components)
+        trimmed_states = np.concatenate([
+            state_data[..., :24],        # joint pos + vel (24)
+            state_data[..., 26:]         # root state (remaining)
+        ], axis=-1)
+        # Go2: Use all actions
+        trimmed_actions = action_data
+        
+    else:
+        # Other robots: no trimming
+        trimmed_states = state_data
+        trimmed_actions = action_data
+        
+    return trimmed_states, trimmed_actions
+
 class KoopmanDatasetCollector():
-    def __init__(self, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15, normalize=True):
+    def __init__(self, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15, normalize=True, m=100, seed=42):
+        np.random.seed(seed)
+        random.seed(seed)
+
         self.normalize = normalize
 
         norm_str = "norm" if self.normalize else "nonorm"
-        data_path = f"../data/datasets/dataset_{env_name}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt"
+        if env_name == "Polynomial":
+            data_path = f"../data/datasets/dataset_{env_name}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt"
+        else:
+            data_path = f"../data/datasets/dataset_{env_name}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt"
         
         self.u_dim = None
         self.state_dim = None
 
         if env_name == "Polynomial":
-            collector = PolynomialDataCollector()
+            collector = PolynomialDataCollector(m=m)
             self.state_dim = collector.state_dim
         elif env_name == "LogisticMap":
             collector = LogisticMapDataCollector()
@@ -408,12 +452,19 @@ class KoopmanDatasetCollector():
             self.u_dim = collector.u_dim
         elif env_name == "G1":
             collector = G1Go2DataCollector(env_name, use_initial_data=False)
-            self.state_dim = 87
-            self.u_dim = 37
+            self.full_state_dim = 87  # Original state dimension
+            self.full_u_dim = 37      # Original action dimension
+            self.state_dim = 46       # Trimmed state dimension (23+23+1+6-6 = 47? Let's calculate properly)
+            # G1 trimmed: 23 joint_pos + 23 joint_vel + 1 height + 6 root_state = 53
+            self.state_dim = 53
+            self.u_dim = 23           # Trimmed action dimension
         elif env_name == "Go2":
             collector = G1Go2DataCollector(env_name, use_initial_data=False)
-            self.state_dim = 37
-            self.u_dim = 12
+            self.full_state_dim = 37  # Original state dimension  
+            self.full_u_dim = 12      # Original action dimension
+            # Go2 trimmed: 24 joint_states + remaining_root = 24 + (37-26) = 24 + 11 = 35
+            self.state_dim = 35
+            self.u_dim = 12           # All actions for Go2
         elif env_name == "Kinova":
             collector = KinovaDataCollector()
             self.state_dim = collector.state_dim
@@ -423,6 +474,34 @@ class KoopmanDatasetCollector():
         
         if not os.path.exists(data_path):
             data = collector.collect_koopman_data(train_samples+val_samples+test_samples, Ksteps)
+            
+            # Apply state trimming for G1 and Go2
+            if env_name in ["G1", "Go2"]:
+                print(f"[INFO] Original data shape: {data.shape}")
+                # Extract states and actions from combined data
+                if self.u_dim is not None:
+                    original_states = data[:-1, :, self.full_u_dim:]  # Skip last timestep for states
+                    original_actions = data[:-1, :, :self.full_u_dim]  # Actions for all timesteps except last
+                    last_states = data[-1:, :, self.full_u_dim:]       # Last timestep state
+                    
+                    # Apply trimming
+                    trimmed_states, trimmed_actions = trim_robot_states(env_name, original_states, original_actions)
+                    trimmed_last_states, _ = trim_robot_states(env_name, last_states, np.zeros_like(last_states[..., :self.u_dim]))
+                    
+                    # Reconstruct data with trimmed dimensions
+                    T, N, _ = data.shape
+                    new_data = np.empty((T, N, self.u_dim + self.state_dim), dtype=data.dtype)
+                    
+                    # Fill in the trimmed data
+                    for t in range(T-1):
+                        new_data[t, :, :] = np.concatenate([trimmed_actions[t], trimmed_states[t]], axis=-1)
+                    # Last timestep: zero actions + last state
+                    new_data[T-1, :, :] = np.concatenate([np.zeros((N, self.u_dim)), trimmed_last_states[0]], axis=-1)
+                    
+                    data = new_data
+                    print(f"[INFO] Trimmed data shape: {data.shape}")
+                    print(f"[INFO] New state_dim: {self.state_dim}, new u_dim: {self.u_dim}")
+
             permutation = np.random.permutation(data.shape[1])
             shuffled = data[:, permutation, :]
 
@@ -452,12 +531,30 @@ class KoopmanDatasetCollector():
                     val_data[..., self.u_dim:] = (val_data[..., self.u_dim:] - state_train_mean) / (state_train_std)
                     test_data[..., :self.u_dim] = (test_data[..., :self.u_dim] - action_train_mean) / (action_train_std)
                     test_data[..., self.u_dim:] = (test_data[..., self.u_dim:] - state_train_mean) / (state_train_std)
-            
-            torch.save({"Ktrain_data": train_data, "Kval_data": val_data, "Ktest_data": test_data}, data_path)
 
-        self.train_data = torch.load(data_path, weights_only=False)["Ktrain_data"]
-        self.val_data = torch.load(data_path, weights_only=False)["Kval_data"]
-        self.test_data = torch.load(data_path, weights_only=False)["Ktest_data"]
+                    self.norm_stats = {
+                        'action_mean': action_train_mean,   # shape (u_dim_trim,)
+                        'action_std':  action_train_std,
+                        'state_mean':  state_train_mean,    # shape (state_dim_trim,)
+                        'state_std':   state_train_std,
+                    }
+            
+            # torch.save({"Ktrain_data": train_data, "Kval_data": val_data, "Ktest_data": test_data}, data_path)
+            torch.save({
+                "Ktrain_data": train_data,
+                "Kval_data":   val_data,
+                "Ktest_data":  test_data,
+                "norm_stats":  self.norm_stats if self.normalize and self.u_dim is not None else None,
+            }, data_path)
+
+        # self.train_data = torch.load(data_path, weights_only=False)["Ktrain_data"]
+        # self.val_data = torch.load(data_path, weights_only=False)["Kval_data"]
+        # self.test_data = torch.load(data_path, weights_only=False)["Ktest_data"]
+        loaded = torch.load(data_path, weights_only=False)
+        self.train_data = loaded["Ktrain_data"]
+        self.val_data   = loaded["Kval_data"]
+        self.test_data  = loaded["Ktest_data"]
+        self.norm_stats = loaded.get("norm_stats", None)
 
     
     def get_data(self):
