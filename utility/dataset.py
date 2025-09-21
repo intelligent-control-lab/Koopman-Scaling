@@ -284,6 +284,7 @@ class FrankaDataCollector(object):
 
 class G1Go2DataCollector():
     def __init__(self, env_name, use_initial_data=False):
+        self.use_initial_data = use_initial_data
         if use_initial_data:
             g1_initial_path = 'None_trajnum90000_trajlen100'
             go2_initial_path = 'None_trajnum89947_trajlen100'
@@ -296,40 +297,50 @@ class G1Go2DataCollector():
                 raise ValueError("Dataset not found for the given environment.")
             self.data_pathes = [initial_dataset_path]
         else:
-            go2_tracking_path_0 = '2025-03-24-20-45-16_trajnum30000_trajlen15'
-            go2_tracking_path_1 = '2025-03-24-21-14-03_trajnum30000_trajlen15'
-            go2_tracking_path_2 = '2025-03-24-21-57-32_trajnum30000_trajlen15'
-            go2_tracking_path_3 = '2025-03-24-22-46-11_trajnum30000_trajlen15'
-            g1_tracking_path_0 = '2025-03-23-23-31-06_trajnum30000_trajlen15'
-            g1_tracking_path_1 = '2025-03-23-23-59-32_trajnum30000_trajlen15'
-            g1_tracking_path_2 = '2025-03-24-00-43-16_trajnum30000_trajlen15'
-            g1_tracking_path_3 = '2025-03-24-01-32-42_trajnum30000_trajlen15'
-            g1_tracking_path_4 = '2025-03-24-02-38-25_trajnum30000_trajlen15'
-            g1_tracking_path_5 = '2025-03-24-04-01-44_trajnum30000_trajlen15'
-            try:
-                if env_name == 'Go2':
-                    tracking_dataset_path_0 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_0}.npz"
-                    tracking_dataset_path_1 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_1}.npz"
-                    tracking_dataset_path_2 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_2}.npz"
-                    tracking_dataset_path_3 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_3}.npz"
-                    self.data_pathes = [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3]
-                elif env_name == 'G1':
-                    tracking_dataset_path_0 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_0}.npz"
-                    tracking_dataset_path_1 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_1}.npz"
-                    tracking_dataset_path_2 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_2}.npz"
-                    tracking_dataset_path_3 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_3}.npz"
-                    tracking_dataset_path_4 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_4}.npz"
-                    tracking_dataset_path_5 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_5}.npz"
-                    self.data_pathes = [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3, tracking_dataset_path_4, tracking_dataset_path_5]
-            except:
-                raise ValueError("Dataset not found for the given environment.")
+            self.data_pathes = []
+    
+        go2_tracking_path_0 = '2025-03-24-20-45-16_trajnum30000_trajlen15'
+        go2_tracking_path_1 = '2025-03-24-21-14-03_trajnum30000_trajlen15'
+        go2_tracking_path_2 = '2025-03-24-21-57-32_trajnum30000_trajlen15'
+        go2_tracking_path_3 = '2025-03-24-22-46-11_trajnum30000_trajlen15'
+        g1_tracking_path_0 = '2025-03-23-23-31-06_trajnum30000_trajlen15'
+        g1_tracking_path_1 = '2025-03-23-23-59-32_trajnum30000_trajlen15'
+        g1_tracking_path_2 = '2025-03-24-00-43-16_trajnum30000_trajlen15'
+        g1_tracking_path_3 = '2025-03-24-01-32-42_trajnum30000_trajlen15'
+        g1_tracking_path_4 = '2025-03-24-02-38-25_trajnum30000_trajlen15'
+        g1_tracking_path_5 = '2025-03-24-04-01-44_trajnum30000_trajlen15'
+        try:
+            if env_name == 'Go2':
+                tracking_dataset_path_0 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_0}.npz"
+                tracking_dataset_path_1 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_1}.npz"
+                tracking_dataset_path_2 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_2}.npz"
+                tracking_dataset_path_3 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_3}.npz"
+                # append new data paths
+                self.data_pathes = self.data_pathes + [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3]
+            elif env_name == 'G1':
+                tracking_dataset_path_0 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_0}.npz"
+                tracking_dataset_path_1 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_1}.npz"
+                tracking_dataset_path_2 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_2}.npz"
+                tracking_dataset_path_3 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_3}.npz"
+                tracking_dataset_path_4 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_4}.npz"
+                tracking_dataset_path_5 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_5}.npz"
+                self.data_pathes = self.data_pathes + [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3, tracking_dataset_path_4, tracking_dataset_path_5]
+        except:
+            raise ValueError("Dataset not found for the given environment.")
     
     def get_data(self, data_paths, steps=15):
         state_data = []
         action_data = []
-        for path in data_paths:
-            state_data.append(np.load(path)['state_data'])
-            action_data.append(np.load(path)['action_data'])
+        n_initial = 60000
+        for i, path in enumerate(data_paths):
+            if self.use_initial_data and i == 0:
+                state_data.append(np.load(path)['state_data'][:, :n_initial, :])
+                action_data.append(np.load(path)['action_data'][:, :n_initial, :])
+            else:
+                # use all samples
+                state_data.append(np.load(path)['state_data'])
+                action_data.append(np.load(path)['action_data'])
+
             if state_data[-1].shape[0] != steps+1:
                 state_data[-1] = state_data[-1][:steps+1, :, :]
                 action_data[-1] = action_data[-1][:steps, :, :]
@@ -451,7 +462,7 @@ class KoopmanDatasetCollector():
             self.state_dim = collector.state_dim
             self.u_dim = collector.u_dim
         elif env_name == "G1":
-            collector = G1Go2DataCollector(env_name, use_initial_data=False)
+            collector = G1Go2DataCollector(env_name, use_initial_data=True)
             self.full_state_dim = 87  # Original state dimension
             self.full_u_dim = 37      # Original action dimension
             self.state_dim = 46       # Trimmed state dimension (23+23+1+6-6 = 47? Let's calculate properly)
@@ -459,7 +470,7 @@ class KoopmanDatasetCollector():
             self.state_dim = 53
             self.u_dim = 23           # Trimmed action dimension
         elif env_name == "Go2":
-            collector = G1Go2DataCollector(env_name, use_initial_data=False)
+            collector = G1Go2DataCollector(env_name, use_initial_data=True)
             self.full_state_dim = 37  # Original state dimension  
             self.full_u_dim = 12      # Original action dimension
             # Go2 trimmed: 24 joint_states + remaining_root = 24 + (37-26) = 24 + 11 = 35
