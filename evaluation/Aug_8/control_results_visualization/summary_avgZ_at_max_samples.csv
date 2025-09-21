@@ -1,0 +1,3 @@
+Environment,train_samples,avg_over_z,JrPE_base,JrPE_impr_cov_%,JrPE_impr_ctrl_%,JrPE_impr_both_%,Surv_base,Surv_impr_cov_%,Surv_impr_ctrl_%,Surv_impr_both_%,JrPE_synergy_%,Surv_synergy_%,n_z_covered
+G1,200000,True,0.14939991182582155,-5.3,7.0,2.7,58.74924,-0.2,-5.4,-4.2,-4.3,-4.1,5
+Go2,140000,True,0.17654578349162467,5.7,26.5,26.9,67.35724,9.7,28.9,48.2,0.4,19.3,5

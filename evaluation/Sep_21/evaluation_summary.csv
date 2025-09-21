@@ -1,0 +1,2 @@
+Environment,TrainSamples,EncodeDim,UseCovLoss,UseControlLoss,WeightedError,NormalizedCovLoss
+DampingPendulum,1000,2,0,0,0.013000742532312868,4868573.999999995
