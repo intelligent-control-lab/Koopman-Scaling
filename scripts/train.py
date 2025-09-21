@@ -106,18 +106,7 @@ def log_to_csv(log_path, log_dict):
             writer.writeheader()
         writer.writerow(log_dict)
 
-# ----------------------------
-# Effective sample-size mapping (for display/analysis)
-# ----------------------------
-def effective_samples(env: str, sample_size: int) -> int:
-    if env == 'G1':
-        return int(sample_size * 200000 / 60000)
-    elif env == 'Go2':
-        return int(sample_size * 140000 / 60000)
-    return sample_size
-
-
-def train(project_name, env_name, train_samples=60000, val_samples=20000, test_samples=20000, Ksteps=15,
+def train(project_name, env_name, max_train_samples=140000, train_samples=140000, val_samples=20000, test_samples=20000, Ksteps=15,
           train_steps=20000, encode_dim=16, hidden_layers=2, hidden_dim=256, gamma=0.99, seed=42, batch_size=64,
           initial_lr=1e-3, lr_step=1000, lr_gamma=0.95, val_step=1000, max_norm=1, normalize=False, use_residual=True,
           use_control_loss=True, use_covariance_loss=False, cov_loss_weight=1, ctrl_loss_weight=1, all_loss=False, m=100,
@@ -139,8 +128,9 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
     os.makedirs(model_dir, exist_ok=True)
     csv_log_path = f"../log/{project_name}/koopman_results_log.csv"
 
-    data_collector = KoopmanDatasetCollector(env_name, train_samples, val_samples, test_samples, Ksteps, normalize=normalize, m=m)
+    data_collector = KoopmanDatasetCollector(env_name, max_train_samples, val_samples, test_samples, Ksteps, normalize=normalize, m=m)
     Ktrain_data, Kval_data, Ktest_data = map(lambda x: torch.from_numpy(x).float(), data_collector.get_data())
+    Ktrain_data = Ktrain_data[:train_samples]
 
     u_dim = data_collector.u_dim
     state_dim = data_collector.state_dim
@@ -254,6 +244,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
         "env_name": env_name,
         "state_dim": state_dim,
         "u_dim": u_dim,
+        "max_train_samples": max_train_samples,
         "train_samples": train_samples,
         "val_samples": val_samples,
         "test_samples": test_samples,
@@ -294,7 +285,7 @@ def train(project_name, env_name, train_samples=60000, val_samples=20000, test_s
 
 def main():
     encode_dims = [1, 2, 4, 8, 16]
-    sample_sizes = [4000, 16000]#[1000, 4000, 16000, 60000]
+    sample_sizes = [1000, 4000, 16000, 64000, 140000]
     layer_depths = [3]
     hidden_dims = [256]
     residuals = [True]
@@ -303,14 +294,13 @@ def main():
     covariance_losses = [False, True]
     cov_loss_weights = [1]
     random_seeds = [17382, 76849, 20965, 84902, 51194]
-    envs = ['Franka']#["DampingPendulum", "DoublePendulum", "Franka", "Kinova", "G1", "Go2", "Polynomial"]
+    envs = ["DampingPendulum", "DoublePendulum", "Franka", "Kinova", "G1", "Go2"] #["Polynomial"]
     train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000,
                    'DampingPendulum': 60000, 'Polynomial': 80000, 'Kinova': 60000}
-    project_name = 'Aug_8'
+    project_name = 'Sep_21'
     ms = [100]
 
-    # Toggle/sweep this list to try both modes
-    encode_dim_modes = [True]  # set to [True, False] to sweep both
+    encode_dim_modes = [True]
 
     for random_seed, env, encode_dim, layer_depth, hidden_dim, residual, control_loss, covariance_loss, ctrl_loss_weight, cov_loss_weight, m, mult_by_input, sample_size in \
         itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals, control_losses, covariance_losses, ctrl_loss_weights, cov_loss_weights, ms, encode_dim_modes, sample_sizes):
@@ -329,13 +319,9 @@ def main():
             gamma = 0.8
             normalize = False
 
-        if env == 'G1':
-            sample_size = int(sample_size * 200000/60000)
-        elif env == 'Go2':
-            sample_size = int(sample_size * 140000/60000)
-
         train(project_name=project_name,
               env_name=env,
+              max_train_samples=140000,
               train_samples=sample_size,
               val_samples=20000,
               test_samples=20000,
