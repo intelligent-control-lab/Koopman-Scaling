@@ -10,6 +10,7 @@ import os
 import sys
 import csv
 from datetime import datetime
+import argparse
 
 sys.path.append('../utility')
 from dataset import KoopmanDatasetCollector, KoopmanDataset
@@ -130,7 +131,7 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
 
     data_collector = KoopmanDatasetCollector(env_name, max_train_samples, val_samples, test_samples, Ksteps, normalize=normalize, m=m)
     Ktrain_data, Kval_data, Ktest_data = map(lambda x: torch.from_numpy(x).float(), data_collector.get_data())
-    Ktrain_data = Ktrain_data[:train_samples]
+    Ktrain_data = Ktrain_data[:, :train_samples, :]
 
     u_dim = data_collector.u_dim
     state_dim = data_collector.state_dim
@@ -282,72 +283,76 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
 
     wandb.finish()
 
-
 def main():
-    encode_dims = [1, 2, 4, 8, 16]
-    sample_sizes = [1000, 4000, 16000, 64000, 140000]
-    layer_depths = [3]
-    hidden_dims = [256]
-    residuals = [True]
-    control_losses = [False, True]
-    ctrl_loss_weights = [1]
-    covariance_losses = [False, True]
-    cov_loss_weights = [1]
-    random_seeds = [17382, 76849, 20965, 84902, 51194]
-    envs = ["DampingPendulum", "DoublePendulum", "Franka", "Kinova", "G1", "Go2"] #["Polynomial"]
-    train_steps = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000,
-                   'DampingPendulum': 60000, 'Polynomial': 80000, 'Kinova': 60000}
-    project_name = 'Sep_21'
-    ms = [100]
+    """
+    Parses command-line arguments and runs the training function.
+    """
+    parser = argparse.ArgumentParser(description="Train Koopman Net")
+    parser.add_argument('--project_name', type=str, default='Sep_21', help='W&B project name')
+    parser.add_argument('--env_name', type=str, required=True, help='Environment name')
+    parser.add_argument('--sample_size', type=int, required=True, help='Number of training samples')
+    parser.add_argument('--encode_dim', type=int, required=True, help='Encoding dimension parameter')
+    parser.add_argument('--layer_depth', type=int, required=True, help='Number of hidden layers')
+    parser.add_argument('--hidden_dim', type=int, required=True, help='Dimension of hidden layers')
+    parser.add_argument('--seed', type=int, required=True, help='Random seed')
+    parser.add_argument('--m', type=int, default=100, help='Parameter m')
+    parser.add_argument('--ctrl_loss_weight', type=float, default=1.0, help='Weight for control loss')
+    parser.add_argument('--cov_loss_weight', type=float, default=1.0, help='Weight for covariance loss')
 
-    encode_dim_modes = [True]
+    # Boolean flags: add them to the command if you want them to be True
+    parser.add_argument('--use_residual', action='store_true', help='Use residual connections')
+    parser.add_argument('--use_control_loss', action='store_true', help='Use control loss')
+    parser.add_argument('--use_covariance_loss', action='store_true', help='Use covariance loss')
+    parser.add_argument('--multiply_encode_by_input_dim', action='store_true', help='Multiply encode_dim by state_dim')
 
-    for random_seed, env, encode_dim, layer_depth, hidden_dim, residual, control_loss, covariance_loss, ctrl_loss_weight, cov_loss_weight, m, mult_by_input, sample_size in \
-        itertools.product(random_seeds, envs, encode_dims, layer_depths, hidden_dims, residuals, control_losses, covariance_losses, ctrl_loss_weights, cov_loss_weights, ms, encode_dim_modes, sample_sizes):
+    args = parser.parse_args()
 
-        if env in ['Polynomial', 'LogisticMap']:
-            Ksteps = 1
-            if control_loss:
-                continue
-        else:
-            Ksteps = 15
+    # --- Environment-specific logic from the original loop ---
+    train_steps_map = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000,
+                       'DampingPendulum': 60000, 'Polynomial': 80000, 'Kinova': 60000}
 
-        if env in ['G1', 'Go2']:
-            gamma = 0.99
-            normalize = True
-        else:
-            gamma = 0.8
-            normalize = False
+    if args.env_name in ['Polynomial', 'LogisticMap']:
+        Ksteps = 1
+    else:
+        Ksteps = 15
 
-        train(project_name=project_name,
-              env_name=env,
-              max_train_samples=140000,
-              train_samples=sample_size,
-              val_samples=20000,
-              test_samples=20000,
-              Ksteps=Ksteps,
-              train_steps=train_steps[env],
-              encode_dim=encode_dim,
-              hidden_layers=layer_depth,
-              hidden_dim=hidden_dim,
-              gamma=gamma,
-              seed=random_seed,
-              batch_size=64,
-              val_step=1000,
-              initial_lr=1e-3,
-              lr_step=1000,
-              lr_gamma=0.9,
-              max_norm=0.1,
-              normalize=normalize,
-              use_residual=residual,
-              use_control_loss=control_loss,
-              use_covariance_loss=covariance_loss,
-              cov_loss_weight=cov_loss_weight,
-              ctrl_loss_weight=ctrl_loss_weight,
-              all_loss=False,
-              m=m,
-              multiply_encode_by_input_dim=mult_by_input
-              )
+    if args.env_name in ['G1', 'Go2']:
+        gamma = 0.99
+        normalize = True
+    else:
+        gamma = 0.8
+        normalize = False
+
+    # --- Call the main training function with parsed arguments ---
+    train(project_name=args.project_name,
+          env_name=args.env_name,
+          max_train_samples=140000,
+          train_samples=args.sample_size,
+          val_samples=20000,
+          test_samples=20000,
+          Ksteps=Ksteps,
+          train_steps=train_steps_map.get(args.env_name, 60000),
+          encode_dim=args.encode_dim,
+          hidden_layers=args.layer_depth,
+          hidden_dim=args.hidden_dim,
+          gamma=gamma,
+          seed=args.seed,
+          batch_size=64,
+          val_step=1000,
+          initial_lr=1e-3,
+          lr_step=1000,
+          lr_gamma=0.9,
+          max_norm=0.1,
+          normalize=normalize,
+          use_residual=args.use_residual,
+          use_control_loss=args.use_control_loss,
+          use_covariance_loss=args.use_covariance_loss,
+          cov_loss_weight=args.cov_loss_weight,
+          ctrl_loss_weight=args.ctrl_loss_weight,
+          all_loss=False,
+          m=args.m,
+          multiply_encode_by_input_dim=args.multiply_encode_by_input_dim
+          )
 
 
 if __name__ == "__main__":

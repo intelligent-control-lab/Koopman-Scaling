@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-CSV=../log/Sep_13/koopman_results_log.csv
-SAVE_PATH=../log/Sep_13/isaac_control_results.csv
-TOTAL_MODELS=800
+PROJECT_NAME=Sep_21
+TOTAL_MODELS=240
+
+CSV=../log/$PROJECT_NAME/koopman_results_log.csv
+SAVE_PATH=../log/$PROJECT_NAME/isaac_control_results.csv
 
 while true; do
   if [ -f "$SAVE_PATH" ]; then processed=$(( $(wc -l < "$SAVE_PATH") - 1 )); else processed=0; fi
