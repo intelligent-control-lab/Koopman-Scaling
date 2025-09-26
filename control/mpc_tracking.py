@@ -20,10 +20,8 @@ parser = argparse.ArgumentParser(description="Batch-track G1 and Go2 with dkuc K
 from isaaclab.app import AppLauncher
 AppLauncher.add_app_launcher_args(parser)
 parser.add_argument('--csv_log_path', type=str,
-    default='../log/Sep_13/koopman_results_log.csv',
     help='CSV with columns [env_name, model_path, ...]')
 parser.add_argument('--save_path', type=str,
-    default='../log/Sep_13/isaac_control_results.csv',
     help='Output CSV for aggregated metrics')
 parser.add_argument('--start_idx', type=int, default=0, help='Start index (resume)')
 args_cli = parser.parse_args()
