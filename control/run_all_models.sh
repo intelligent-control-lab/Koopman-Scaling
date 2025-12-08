@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 PROJECT_NAME=Sep_21
-TOTAL_MODELS=240
+TOTAL_MODELS=1000
 
 CSV=../log/$PROJECT_NAME/koopman_results_log.csv
 SAVE_PATH=../log/$PROJECT_NAME/isaac_control_results.csv
