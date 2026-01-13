@@ -1,0 +1,7 @@
+package exlcm;
+
+struct kinova_interface
+{
+    double   joint_des_pos[7];
+    double   joint_fbk_pos[7];
+}

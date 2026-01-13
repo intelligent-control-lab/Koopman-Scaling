@@ -1,0 +1,82 @@
+<?xml version="1.0"?>
+<robot name="Floor">
+    <link name="robot_base">
+        <visual name="ball1">
+            <origin rpy="0.000000 0.000000 -0.000000" xyz="0.000000 1.000000 0.80000" />
+            <geometry>
+                <sphere radius="0.3"/>
+            </geometry>
+            <material name="CFSObstacle_material">
+                <color rgba="0.000000 0.0 0.640000 1.0" />
+            </material>
+        </visual>
+        <collision name="ball1">
+            <origin rpy="0.000000 0.000000 -0.000000" xyz="0.000000 1.000000 0.80000" />
+            <geometry>
+                <sphere radius="0.3"/>
+                <dissipation>1</dissipation>
+            </geometry>
+        </collision>
+        <visual name="ball2">
+            <origin rpy="0.000000 0.000000 -0.000000" xyz="3.3 2.00000 1.80000" />
+            <geometry>
+                <sphere radius="0.3"/>
+            </geometry>
+            <material name="CFSObstacle_material">
+                <color rgba="0.000000 0.0 0.640000 1.0" />
+            </material>
+        </visual>
+        <collision name="ball2">
+            <origin rpy="0.000000 0.000000 -0.000000" xyz="3.3 2.00000 1.80000" />
+            <geometry>
+                <sphere radius="0.3"/>
+                <dissipation>1</dissipation>
+            </geometry>
+        </collision>
+        <visual name="Floor_2">
+            <origin rpy="1.57 3.141593 -3.141593" xyz="0.000000 0.000000 -0.100000" />
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/environment/environment_Floor_vis_1.obj" />
+            </geometry>
+            <material name="Floor_material">
+                <color rgba="0.640000 0.640000 0.640000 1.0" />
+            </material>
+        </visual>
+        <visual name="Floor_3">
+            <origin rpy="1.57 3.141593 -3.141593" xyz="0.000000 0.000000 -0.100000" />
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/environment/environment_Floor_vis_2.obj" />
+            </geometry>
+            <material name="Floor_material">
+                <color rgba="0.640000 0.640000 0.640000 1.0" />
+            </material>
+        </visual>
+        <visual name="Box">
+            <origin rpy="3.141533 3.141591 -3.141587" xyz="-0.875000 0.575000 0.880000" />
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/environment/environment_Box_vis_1.obj" />
+            </geometry>
+            <material name="Box_material">
+                <color rgba="0.627451 0.627451 0.627451 1.0" />
+            </material>
+        </visual>
+        <visual name="Bagging_Machine">
+            <origin rpy="0.0 0.0 1.57" xyz="2.025000 0.935000 0.830000" />
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/environment/environment_BaggingMachine_vis_1.obj" />
+            </geometry>
+            <material name="BaggingMachine_material">
+                <color rgba="1.000000 1.000000 1.000000 1.0" />
+            </material>
+        </visual>
+        <visual name="Table">
+            <origin rpy="1.570796 1.570853 -1.570796" xyz="-0.690000 0.700000 0.470000" />
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/environment/environment_Table_vis_1.obj" />
+            </geometry>
+            <material name="Table_material">
+                <color rgba="1.000000 1.000000 1.000000 1.0" />
+            </material>
+        </visual>
+    </link>
+</robot>

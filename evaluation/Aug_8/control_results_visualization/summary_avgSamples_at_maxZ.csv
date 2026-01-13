@@ -1,3 +1,0 @@
-Environment,encode_dim,avg_over_samples,JrPE_base,JrPE_impr_cov_%,JrPE_impr_ctrl_%,JrPE_impr_both_%,Surv_base,Surv_impr_cov_%,Surv_impr_ctrl_%,Surv_impr_both_%,JrPE_synergy_%,Surv_synergy_%,n_samples_covered
-G1,848,True,0.22426828011740407,1.3,33.7,32.0,31.6377,1.0,34.0,35.1,-1.7,1.1,4
-Go2,560,True,0.4018033975309342,1.0,0.6,3.6,24.52495,2.3,59.1,93.0,2.6,33.8,4

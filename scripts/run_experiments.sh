@@ -10,16 +10,16 @@
 
 # --- Hyperparameter Definitions ---
 PROJECT_NAME="Sep_21"
-ENVS=("Polynomial") #("DampingPendulum" "DoublePendulum" "Franka" "Kinova" "G1" "Go2", "Polynomial")
+ENVS=("Franka") #("DampingPendulum" "DoublePendulum" "Franka" "Kinova" "G1" "Go2", "Polynomial")
 SEEDS=(17382 76849 20965 84902 51194)
 ENCODE_DIMS=(1 2 4 8 16)
 SAMPLE_SIZES=(1000 4000 16000 64000 140000)
 LAYER_DEPTHS=(3)
 HIDDEN_DIMS=(256)
 RESIDUALS=(True)
-CONTROL_LOSSES=(False) #(False True)
+CONTROL_LOSSES=(False True) #(False True)
 COVARIANCE_LOSSES=(False True)
-MS=(400)
+MS=(0)
 MULT_BY_INPUT=(True) # Corresponds to multiply_encode_by_input_dim
 
 # --- Log File Configuration ---

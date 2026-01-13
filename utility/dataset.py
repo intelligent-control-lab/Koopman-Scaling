@@ -197,6 +197,90 @@ class DoublePendulumDataCollector:
 
         return data
 
+# class FrankaDataCollector(object):
+#     def __init__(self, render=False, ts=0.002, env_name="FrankaEnv"):
+#         # Environment setup
+#         self.frame_skip = 10
+#         if render:
+#             self.client = pb.connect(pb.GUI)
+#         else:
+#             self.client = pb.connect(pb.DIRECT)
+#         pb.setTimeStep(ts)
+#         pb.setAdditionalSearchPath(pybullet_data.getDataPath())
+#         planeID = pb.loadURDF('plane.urdf')
+#         self.robot = pb.loadURDF('../utility/franka_description/robots/franka_panda.urdf', [0., 0., 0.], useFixedBase=1)
+#         pb.setGravity(0, 0, -9.81)
+
+#         # Parameters
+#         self.reset_joint_state = [0., -0.78, 0., -2.35, 0., 1.57, 0.78]
+#         self.ee_id = 7
+#         self.sat_val = 0.3
+#         self.joint_low = np.array([-2.9, -1.8, -2.9, -3.0, -2.9, -0.08, -2.9])
+#         self.joint_high = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9])
+#         self.Nstates = 17
+#         self.udim = 7
+#         self.dt = self.frame_skip * ts
+#         self.uval = 0.12
+#         self.env_name = env_name
+
+#         # Initialize state
+#         self.reset()
+
+#     def reset(self):
+#         for i, jnt in enumerate(self.reset_joint_state):
+#             pb.resetJointState(self.robot, i, self.reset_joint_state[i])
+#         return self.get_state()
+
+#     def reset_state(self, joint):
+#         for i, jnt in enumerate(joint):
+#             pb.resetJointState(self.robot, i, joint[i])
+#         return self.get_state()
+
+#     def step(self, action):
+#         a = np.clip(action, -self.sat_val, self.sat_val)
+#         pb.setJointMotorControlArray(
+#             self.robot, range(7),
+#             pb.VELOCITY_CONTROL, targetVelocities=a)
+#         for _ in range(self.frame_skip):
+#             pb.stepSimulation()
+#         return self.get_state()
+
+#     def get_ik(self, position, orientation=None):
+#         if orientation is None:
+#             jnts = pb.calculateInverseKinematics(self.robot, self.ee_id, position)[:7]
+#         else:
+#             jnts = pb.calculateInverseKinematics(self.robot, self.ee_id, position, orientation)[:7]
+#         return jnts
+
+#     def get_state(self):
+#         jnt_st = pb.getJointStates(self.robot, range(7))
+#         ee_state = pb.getLinkState(self.robot, self.ee_id)[-2:]  # position, orientation
+#         jnt_ang = []
+#         jnt_vel = []
+#         for jnt in jnt_st:
+#             jnt_ang.append(jnt[0])
+#             jnt_vel.append(jnt[1])
+#         self.state = np.concatenate([ee_state[0], ee_state[1], jnt_ang, jnt_vel])
+#         return self.state.copy()
+
+#     def Obs(self, o):
+#         return np.concatenate((o[:3], o[7:]), axis=0)
+
+#     def collect_koopman_data(self, traj_num, steps):
+#         train_data = np.empty((steps + 1, traj_num, self.Nstates + self.udim))
+#         for traj_i in tqdm(range(traj_num)):
+#             noise = (np.random.rand(7) - 0.5) * 2 * 0.2
+#             joint_init = np.clip(np.array(self.reset_joint_state) + noise, self.joint_low, self.joint_high)
+#             s0 = self.reset_state(joint_init)
+#             s0 = self.Obs(s0)
+#             u10 = (np.random.rand(7) - 0.5) * 2 * self.uval
+#             train_data[0, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0).reshape(-1)
+#             for i in range(1, steps + 1):
+#                 s0 = self.step(u10)
+#                 s0 = self.Obs(s0)
+#                 u10 = (np.random.rand(7) - 0.5) * 2 * self.uval
+#                 train_data[i, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0).reshape(-1)
+#        return train_data
 class FrankaDataCollector(object):
     def __init__(self, render=False, ts=0.002, env_name="FrankaEnv"):
         # Environment setup
@@ -205,47 +289,69 @@ class FrankaDataCollector(object):
             self.client = pb.connect(pb.GUI)
         else:
             self.client = pb.connect(pb.DIRECT)
+
         pb.setTimeStep(ts)
         pb.setAdditionalSearchPath(pybullet_data.getDataPath())
-        planeID = pb.loadURDF('plane.urdf')
-        self.robot = pb.loadURDF('../utility/franka_description/robots/franka_panda.urdf', [0., 0., 0.], useFixedBase=1)
+        pb.loadURDF("plane.urdf")
+        self.robot = pb.loadURDF(
+            "../utility/franka_description/robots/franka_panda.urdf",
+            [0.0, 0.0, 0.0],
+            useFixedBase=1,
+        )
         pb.setGravity(0, 0, -9.81)
 
         # Parameters
-        self.reset_joint_state = [0., -0.78, 0., -2.35, 0., 1.57, 0.78]
-        self.ee_id = 7
+        self.reset_joint_state = [0.0, -0.78, 0.0, -2.35, 0.0, 1.57, 0.78]
+        self.ee_id = 7  # kept for IK utility; NOT used in state
         self.sat_val = 0.3
-        self.joint_low = np.array([-2.9, -1.8, -2.9, -3.0, -2.9, -0.08, -2.9])
-        self.joint_high = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9])
-        self.Nstates = 17
+        self.joint_low = np.array([-2.9, -1.8, -2.9, -3.0, -2.9, -0.08, -2.9], dtype=np.float32)
+        self.joint_high = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9], dtype=np.float32)
+
+        # Joint-only state: 7 q + 7 dq = 14
+        self.Nstates = 14
         self.udim = 7
+
         self.dt = self.frame_skip * ts
         self.uval = 0.12
         self.env_name = env_name
 
         # Initialize state
+        self.state = None
         self.reset()
+
+    def close(self):
+        try:
+            pb.disconnect(self.client)
+        except Exception:
+            pass
 
     def reset(self):
         for i, jnt in enumerate(self.reset_joint_state):
-            pb.resetJointState(self.robot, i, self.reset_joint_state[i])
+            pb.resetJointState(self.robot, i, float(jnt))
         return self.get_state()
 
     def reset_state(self, joint):
         for i, jnt in enumerate(joint):
-            pb.resetJointState(self.robot, i, joint[i])
+            pb.resetJointState(self.robot, i, float(jnt))
         return self.get_state()
 
     def step(self, action):
-        a = np.clip(action, -self.sat_val, self.sat_val)
+        a = np.clip(np.asarray(action, dtype=np.float32), -self.sat_val, self.sat_val)
         pb.setJointMotorControlArray(
-            self.robot, range(7),
-            pb.VELOCITY_CONTROL, targetVelocities=a)
+            self.robot,
+            range(7),
+            pb.VELOCITY_CONTROL,
+            targetVelocities=a.tolist(),
+        )
         for _ in range(self.frame_skip):
             pb.stepSimulation()
         return self.get_state()
 
     def get_ik(self, position, orientation=None):
+        """
+        Utility: IK is still available if you need it elsewhere.
+        This does NOT affect the collected state (which is joint-only).
+        """
         if orientation is None:
             jnts = pb.calculateInverseKinematics(self.robot, self.ee_id, position)[:7]
         else:
@@ -253,33 +359,43 @@ class FrankaDataCollector(object):
         return jnts
 
     def get_state(self):
+        """
+        Joint-only state: [q(7), dq(7)] -> (14,)
+        """
         jnt_st = pb.getJointStates(self.robot, range(7))
-        ee_state = pb.getLinkState(self.robot, self.ee_id)[-2:]  # position, orientation
-        jnt_ang = []
-        jnt_vel = []
-        for jnt in jnt_st:
-            jnt_ang.append(jnt[0])
-            jnt_vel.append(jnt[1])
-        self.state = np.concatenate([ee_state[0], ee_state[1], jnt_ang, jnt_vel])
+        q = np.array([s[0] for s in jnt_st], dtype=np.float32)   # (7,)
+        dq = np.array([s[1] for s in jnt_st], dtype=np.float32)  # (7,)
+        self.state = np.concatenate([q, dq], axis=0)             # (14,)
         return self.state.copy()
 
     def Obs(self, o):
-        return np.concatenate((o[:3], o[7:]), axis=0)
+        """
+        Identity mapping since get_state() already returns the desired observation.
+        """
+        return np.asarray(o, dtype=np.float32)
 
     def collect_koopman_data(self, traj_num, steps):
-        train_data = np.empty((steps + 1, traj_num, self.Nstates + self.udim))
+        """
+        Collect random velocity-command rollouts.
+
+        train_data[t, traj_i, :] = [u_t (7), x_t (14)]
+        """
+        train_data = np.empty((steps + 1, traj_num, self.Nstates + self.udim), dtype=np.float32)
+
         for traj_i in tqdm(range(traj_num)):
-            noise = (np.random.rand(7) - 0.5) * 2 * 0.2
-            joint_init = np.clip(np.array(self.reset_joint_state) + noise, self.joint_low, self.joint_high)
-            s0 = self.reset_state(joint_init)
-            s0 = self.Obs(s0)
-            u10 = (np.random.rand(7) - 0.5) * 2 * self.uval
-            train_data[0, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0).reshape(-1)
-            for i in range(1, steps + 1):
-                s0 = self.step(u10)
-                s0 = self.Obs(s0)
-                u10 = (np.random.rand(7) - 0.5) * 2 * self.uval
-                train_data[i, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0).reshape(-1)
+            noise = (np.random.rand(7).astype(np.float32) - 0.5) * 2.0 * 0.2
+            joint_init = np.clip(np.array(self.reset_joint_state, dtype=np.float32) + noise,
+                                 self.joint_low, self.joint_high)
+            x = self.Obs(self.reset_state(joint_init))  # (14,)
+
+            u = (np.random.rand(7).astype(np.float32) - 0.5) * 2.0 * self.uval  # (7,)
+            train_data[0, traj_i, :] = np.concatenate([u, x], axis=0)
+
+            for t in range(1, steps + 1):
+                x = self.Obs(self.step(u))  # state after applying previous action
+                u = (np.random.rand(7).astype(np.float32) - 0.5) * 2.0 * self.uval
+                train_data[t, traj_i, :] = np.concatenate([u, x], axis=0)
+
         return train_data
 
 class G1Go2DataCollector():
@@ -451,8 +567,8 @@ class KoopmanDatasetCollector():
             self.state_dim = collector.state_dim
         elif env_name == "Franka":
             collector = FrankaDataCollector()
-            self.state_dim = 17
-            self.u_dim = 7
+            self.state_dim = collector.Nstates
+            self.u_dim = collector.udim
         elif env_name == "DoublePendulum":
             collector = DoublePendulumDataCollector()
             self.state_dim = collector.state_dim

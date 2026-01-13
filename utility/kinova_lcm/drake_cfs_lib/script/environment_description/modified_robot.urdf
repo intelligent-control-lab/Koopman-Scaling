@@ -1,0 +1,21 @@
+<robot name="Floor">
+    <link name="robot_base">
+        <visual name="ball1">
+            <origin rpy="0.000000 0.000000 -0.000000" xyz="0.000000 1.000000 0.80000" />
+            <geometry>
+                <sphere radius="0.3" />
+            </geometry>
+            <material name="CFSObstacle_material">
+                <color rgba="0.000000 0.0 0.640000 1.0" />
+            </material>
+        </visual>
+        <collision name="ball1">
+            <origin rpy="0.000000 0.000000 -0.000000" xyz="0.000000 1.000000 0.80000" />
+            <geometry>
+                <sphere radius="0.3" />
+                <dissipation>1</dissipation>
+            </geometry>
+        </collision>
+        
+    </link>
+<robot>
