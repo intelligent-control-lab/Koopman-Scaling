@@ -1,0 +1,201 @@
+<?xml version="1.0"?>
+<robot name="GP7">
+    <!-- link list -->
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/visual/gp12_base_link.obj"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/collision/gp12_base_link.obj"/>
+            </geometry>
+        </collision>
+    </link>
+    <link name="link_1_s">
+        <visual>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/visual/gp12_link_1_s.obj"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/collision/gp12_link_1_s.obj"/>
+            </geometry>
+        </collision>
+    </link>
+    <link name="link_2_l">
+        <visual>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/visual/gp12_link_2_l.obj"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/collision/gp12_link_2_l.obj"/>
+            </geometry>
+        </collision>
+    </link>
+    <link name="link_3_u">
+        <visual>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/visual/gp12_link_3_u.obj"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/collision/gp12_link_3_u.obj"/>
+            </geometry>
+        </collision>
+    </link>
+    <link name="link_4_r">
+        <visual>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/visual/gp12_link_4_r.obj"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/collision/gp12_link_4_r.obj"/>
+            </geometry>
+        </collision>
+    </link>
+    <link name="link_5_b">
+        <visual>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/visual/gp12_link_5_b.obj"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/collision/gp12_link_5_b.obj"/>
+            </geometry>
+        </collision>
+    </link>
+    <link name="link_6_t">
+        <visual>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/visual/gp12_link_6_t.obj"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/collision/gp12_link_6_t.obj"/>
+            </geometry>
+        </collision>
+        <visual>
+            <origin rpy="-1.57 0 -1.57" xyz="0.0 0.0 -0.06"/>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/visual/suction_gripper.obj"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+        <collision>
+            <origin rpy="-1.57 0 -1.57" xyz="0. 0 -0.06"/>
+            <geometry>
+                <mesh filename="/home/zhongqi/Documents/workspace/drake_cfs_lib/script/environment_description/gp12/meshes/collision/suction_gripper.obj"/>
+            </geometry>
+        </collision>
+    </link>
+    <link name="tool0">
+        <visual name="Endeffector">
+            <origin rpy="0.000000 0.000000 0.000000" xyz="0.000000 0.000000 0.000000" />
+            <geometry>
+                <sphere radius="0.02"/>
+            </geometry>
+            <material name="Endeffector_material">
+                <color rgba="0.129411765 0.149019608 0.749019608 1.0" />
+            </material>
+        </visual>
+    </link>
+    <!-- end of link list -->
+
+    <!-- joint list -->
+    <joint name="joint_1_s" type="revolute">
+        <parent link="base_link"/>
+        <child link="link_1_s"/>
+        <origin xyz="0 0 0.450" rpy="0 0 0" />
+        <axis xyz="0 0 1" />
+        <limit lower="-2.9670" upper="2.9670" effort="926.10" velocity="4.5355"/>
+    </joint>
+    <joint name="joint_2_l" type="revolute">
+        <parent link="link_1_s"/>
+        <child link="link_2_l"/>
+        <origin xyz="0.155 0 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+        <limit lower="-1.5708" upper="2.7052" effort="1029.00" velocity="4.0132"/>
+    </joint>
+    <joint name="joint_3_u" type="revolute">
+        <parent link="link_2_l"/>
+        <child link="link_3_u"/>
+        <origin xyz="0 0 0.614" rpy="0 0 0" />
+        <axis xyz="0 -1 0" />
+        <limit lower="-1.4835" upper="2.6179" effort="551.25" velocity="4.5375"/>
+    </joint>
+    <joint name="joint_4_r" type="revolute">
+        <parent link="link_3_u"/>
+        <child link="link_4_r"/>
+        <origin xyz="0.640 0 0.200" rpy="0 0 0" />
+        <axis xyz="-1 0 0" />
+        <limit lower="-3.4906" upper="3.4906" effort="89.96" velocity="8.2007"/>
+    </joint>
+    <joint name="joint_5_b" type="revolute">
+        <parent link="link_4_r"/>
+        <child link="link_5_b"/>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <axis xyz="0 -1 0" />
+        <limit lower="-2.6179" upper="2.6179" effort="67.03" velocity="8.1992"/>
+    </joint>
+    <joint name="joint_6_t" type="revolute">
+        <parent link="link_5_b"/>
+        <child link="link_6_t"/>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <axis xyz="-1 0 0" />
+        <limit lower="-7.9412" upper="7.9412" effort="33.30" velocity="12.2143"/>
+    </joint>
+    <joint name="joint_6_t-tool0" type="fixed">
+        <origin rpy="0.000000 0.000000 0.000000" xyz="0.000000 0.000000 -0.600000" />
+        <parent link="link_6_t"/>
+        <child link="tool0"/>
+    </joint>
+    <!-- end of joint list -->
+
+    <!-- ROS base_link to Robot Manufacturer World Coordinates transform -->
+    <!-- <link name="base" />
+    <joint name="base_link-base" type="fixed">
+        <origin xyz="0 0 0.450" rpy="0 0 0"/>
+        <parent link="base_link"/>
+        <child link="base"/>
+    </joint> -->
+
+    <!-- <link name="world" />
+    <joint name="world-base_link" type="floating">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <parent link="world"/>
+        <child link="base_link"/>
+    </joint> -->
+</robot>

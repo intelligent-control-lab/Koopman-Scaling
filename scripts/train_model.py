@@ -157,9 +157,9 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
 
     mode_tag = "per_state" if multiply_encode_by_input_dim else "absolute"
-    wandb.init(project=project_name,
-               name=f"{env_name}_edim{actual_encode_dim}_{mode_tag}_covloss_{use_covariance_loss}_ctrlloss_{use_control_loss}_seed{seed}",
-               config=locals())
+    # wandb.init(project=project_name,
+    #            name=f"{env_name}_edim{actual_encode_dim}_{mode_tag}_covloss_{use_covariance_loss}_ctrlloss_{use_control_loss}_seed{seed}",
+    #            config=locals())
 
     best_loss = 1e10
     val_losses = []
@@ -194,7 +194,7 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
             optimizer.step()
             scheduler.step()
 
-            wandb.log({"Train/Kloss": Kloss.item(), "Train/ControlLoss": Ctrlloss.item(), "step": step})
+            # wandb.log({"Train/Kloss": Kloss.item(), "Train/ControlLoss": Ctrlloss.item(), "step": step})
 
             if step % val_step == 0:
                 with torch.no_grad():
@@ -216,19 +216,19 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
                         }, best_model_path)
 
                     val_losses.append(val_loss.item())
-                    wandb.log({
-                        "Val/Kloss": Kloss_val.item(),
-                        "Val/ControlLoss": Ctrlloss_val.item(),
-                        "Val/CovLoss": Closs_val.item(),
-                        "Val/best_Kloss": best_loss.item(),
-                        "step": step
-                    })
+                    # wandb.log({
+                    #     "Val/Kloss": Kloss_val.item(),
+                    #     "Val/ControlLoss": Ctrlloss_val.item(),
+                    #     "Val/CovLoss": Closs_val.item(),
+                    #     "Val/best_Kloss": best_loss.item(),
+                    #     "step": step
+                    # })
                     print(f"Step {step}: Val Kloss: {Kloss_val.item()}")
 
             step += 1
 
         convergence_loss = np.mean(val_losses[-10:]) if len(val_losses) >= 10 else np.mean(val_losses)
-    wandb.log({"best_loss": best_loss.item(), "convergence_loss": convergence_loss})
+    # wandb.log({"best_loss": best_loss.item(), "convergence_loss": convergence_loss})
 
     assert best_model_path is not None and os.path.exists(best_model_path), "Best model not saved properly."
     checkpoint = torch.load(best_model_path, weights_only=False, map_location=device)
@@ -281,7 +281,7 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
         "m": m
     })
 
-    wandb.finish()
+    # wandb.finish()
 
 def main():
     """
