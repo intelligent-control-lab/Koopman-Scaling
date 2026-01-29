@@ -27,7 +27,7 @@ SEEDS=(17382 76849 20965 84902 51194)
 ENCODE_DIMS=(1 2 4 8 16)
 
 # coefficients for m = c * n * ln(n)
-COEFFS=(5 20 40)
+COEFFS=(1 5 10 20 40 100)
 
 LAYER_DEPTHS=(3)
 HIDDEN_DIMS=(256)
@@ -175,6 +175,7 @@ for SEED in "${SEEDS[@]}"; do
                       fi
 
                       CMD="python train_model.py \
+                        --project_name \"$PROJECT_NAME\" \
                         --env_name $ENV \
                         --seed $SEED \
                         --encode_dim $ENCODE_DIM \
