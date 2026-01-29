@@ -288,7 +288,7 @@ def main():
     Parses command-line arguments and runs the training function.
     """
     parser = argparse.ArgumentParser(description="Train Koopman Net")
-    parser.add_argument('--project_name', type=str, default='Sep_21', help='W&B project name')
+    parser.add_argument('--project_name', type=str, required=True, help='Project name')
     parser.add_argument('--env_name', type=str, required=True, help='Environment name')
     parser.add_argument('--sample_size', type=int, required=True, help='Number of training samples')
     parser.add_argument('--encode_dim', type=int, required=True, help='Encoding dimension parameter')

@@ -10,14 +10,14 @@
 
 # --- Hyperparameter Definitions ---
 PROJECT_NAME="Sep_21"
-ENVS=("Franka") #("DampingPendulum" "DoublePendulum" "Franka" "Kinova" "G1" "Go2", "Polynomial")
+ENVS=("DampingPendulum" "DoublePendulum" "Franka" "Kinova" "G1" "Go2" "Polynomial")
 SEEDS=(17382 76849 20965 84902 51194)
 ENCODE_DIMS=(1 2 4 8 16)
 SAMPLE_SIZES=(1000 4000 16000 64000 140000)
 LAYER_DEPTHS=(3)
 HIDDEN_DIMS=(256)
 RESIDUALS=(True)
-CONTROL_LOSSES=(False True) #(False True)
+CONTROL_LOSSES=(False True)
 COVARIANCE_LOSSES=(False True)
 MS=(0)
 MULT_BY_INPUT=(True) # Corresponds to multiply_encode_by_input_dim
@@ -124,7 +124,7 @@ for SEED in "${SEEDS[@]}"; do
                       fi
 
                       # Build the python command
-                      CMD="python train_model.py --env_name $ENV --seed $SEED --encode_dim $ENCODE_DIM --sample_size $SAMPLE_SIZE --layer_depth $LAYER_DEPTH --hidden_dim $HIDDEN_DIM --m $M"
+                      CMD="python train_model.py --project_name \"$PROJECT_NAME\" --env_name \"$ENV\" --seed \"$SEED\" --encode_dim \"$ENCODE_DIM\" --sample_size \"$SAMPLE_SIZE\" --layer_depth \"$LAYER_DEPTH\" --hidden_dim \"$HIDDEN_DIM\" --m \"$M\""
 
                       # Add boolean flags only if they are true
                       if [ "$RESIDUAL" == "True" ]; then CMD="$CMD --use_residual"; fi
