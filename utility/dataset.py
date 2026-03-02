@@ -8,7 +8,19 @@ import pybullet_data
 from tqdm import tqdm
 from scipy.integrate import odeint
 import random
-import gym
+
+
+def _get_project_root():
+    """Get absolute path to Koopman-Scaling project root."""
+    # This file is in utility/, so project root is one level up
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(script_dir)
+
+def _get_franka_urdf_path():
+    """Get absolute path to Franka URDF file."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    urdf_path = os.path.join(script_dir, "franka_description", "robots", "franka_panda.urdf")
+    return urdf_path
 
 class PolynomialDataCollector:
     def __init__(self, state_dim=3, m=100, a1=0.85, a2=0.9, a3=0.90, b=None):
@@ -197,126 +209,64 @@ class DoublePendulumDataCollector:
 
         return data
 
-# class FrankaDataCollector(object):
-#     def __init__(self, render=False, ts=0.002, env_name="FrankaEnv"):
-#         # Environment setup
-#         self.frame_skip = 10
-#         if render:
-#             self.client = pb.connect(pb.GUI)
-#         else:
-#             self.client = pb.connect(pb.DIRECT)
-#         pb.setTimeStep(ts)
-#         pb.setAdditionalSearchPath(pybullet_data.getDataPath())
-#         planeID = pb.loadURDF('plane.urdf')
-#         self.robot = pb.loadURDF('../utility/franka_description/robots/franka_panda.urdf', [0., 0., 0.], useFixedBase=1)
-#         pb.setGravity(0, 0, -9.81)
+class FrankaDataCollector:
+    """
+    Improved data collector for Franka robot dynamics learning.
 
-#         # Parameters
-#         self.reset_joint_state = [0., -0.78, 0., -2.35, 0., 1.57, 0.78]
-#         self.ee_id = 7
-#         self.sat_val = 0.3
-#         self.joint_low = np.array([-2.9, -1.8, -2.9, -3.0, -2.9, -0.08, -2.9])
-#         self.joint_high = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9])
-#         self.Nstates = 17
-#         self.udim = 7
-#         self.dt = self.frame_skip * ts
-#         self.uval = 0.12
-#         self.env_name = env_name
+    Key improvements over the original FrankaDataCollector:
+    - ~2x larger velocity range (0.04-0.30 vs 0.12 rad/s)
+    - Full joint space initialization (vs +/-0.2 rad from home)
+    - 3 trajectory types: goal-reaching, smooth random walk, sinusoidal
+    - Temporal correlation in actions (vs iid noise)
 
-#         # Initialize state
-#         self.reset()
+    Trajectory types:
+    - goal_reaching (40%): Minimum-jerk point-to-point motion
+    - smooth_random (40%): Ornstein-Uhlenbeck correlated random walk
+    - sinusoidal (20%): Periodic oscillations for frequency coverage
+    """
 
-#     def reset(self):
-#         for i, jnt in enumerate(self.reset_joint_state):
-#             pb.resetJointState(self.robot, i, self.reset_joint_state[i])
-#         return self.get_state()
+    # Joint limits from Franka URDF
+    JOINT_LOW = np.array([-2.9, -1.8, -2.9, -3.0, -2.9, -0.08, -2.9], dtype=np.float32)
+    JOINT_HIGH = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9], dtype=np.float32)
 
-#     def reset_state(self, joint):
-#         for i, jnt in enumerate(joint):
-#             pb.resetJointState(self.robot, i, joint[i])
-#         return self.get_state()
+    # Per-joint velocity limits (rad/s)
+    VELOCITY_LIMITS = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
 
-#     def step(self, action):
-#         a = np.clip(action, -self.sat_val, self.sat_val)
-#         pb.setJointMotorControlArray(
-#             self.robot, range(7),
-#             pb.VELOCITY_CONTROL, targetVelocities=a)
-#         for _ in range(self.frame_skip):
-#             pb.stepSimulation()
-#         return self.get_state()
+    # Velocity regimes
+    VELOCITY_REGIMES = {
+        'slow': (0.04, 0.12),
+        'medium': (0.12, 0.20),
+        'fast': (0.20, 0.30),
+    }
+    REGIME_WEIGHTS = np.array([0.30, 0.40, 0.30])
 
-#     def get_ik(self, position, orientation=None):
-#         if orientation is None:
-#             jnts = pb.calculateInverseKinematics(self.robot, self.ee_id, position)[:7]
-#         else:
-#             jnts = pb.calculateInverseKinematics(self.robot, self.ee_id, position, orientation)[:7]
-#         return jnts
-
-#     def get_state(self):
-#         jnt_st = pb.getJointStates(self.robot, range(7))
-#         ee_state = pb.getLinkState(self.robot, self.ee_id)[-2:]  # position, orientation
-#         jnt_ang = []
-#         jnt_vel = []
-#         for jnt in jnt_st:
-#             jnt_ang.append(jnt[0])
-#             jnt_vel.append(jnt[1])
-#         self.state = np.concatenate([ee_state[0], ee_state[1], jnt_ang, jnt_vel])
-#         return self.state.copy()
-
-#     def Obs(self, o):
-#         return np.concatenate((o[:3], o[7:]), axis=0)
-
-#     def collect_koopman_data(self, traj_num, steps):
-#         train_data = np.empty((steps + 1, traj_num, self.Nstates + self.udim))
-#         for traj_i in tqdm(range(traj_num)):
-#             noise = (np.random.rand(7) - 0.5) * 2 * 0.2
-#             joint_init = np.clip(np.array(self.reset_joint_state) + noise, self.joint_low, self.joint_high)
-#             s0 = self.reset_state(joint_init)
-#             s0 = self.Obs(s0)
-#             u10 = (np.random.rand(7) - 0.5) * 2 * self.uval
-#             train_data[0, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0).reshape(-1)
-#             for i in range(1, steps + 1):
-#                 s0 = self.step(u10)
-#                 s0 = self.Obs(s0)
-#                 u10 = (np.random.rand(7) - 0.5) * 2 * self.uval
-#                 train_data[i, traj_i, :] = np.concatenate([u10.reshape(-1), s0.reshape(-1)], axis=0).reshape(-1)
-#        return train_data
-class FrankaDataCollector(object):
-    def __init__(self, render=False, ts=0.002, env_name="FrankaEnv"):
-        # Environment setup
+    def __init__(self, render=False, ts=0.002, seed=42):
+        """Initialize Franka data collector with PyBullet simulation."""
         self.frame_skip = 10
-        if render:
-            self.client = pb.connect(pb.GUI)
-        else:
-            self.client = pb.connect(pb.DIRECT)
+        self.dt = self.frame_skip * ts
+        self.ts = ts
 
+        # PyBullet setup
+        self.client = pb.connect(pb.GUI if render else pb.DIRECT)
         pb.setTimeStep(ts)
         pb.setAdditionalSearchPath(pybullet_data.getDataPath())
         pb.loadURDF("plane.urdf")
         self.robot = pb.loadURDF(
-            "../utility/franka_description/robots/franka_panda.urdf",
-            [0.0, 0.0, 0.0],
-            useFixedBase=1,
+            _get_franka_urdf_path(),
+            [0.0, 0.0, 0.0], useFixedBase=1,
         )
         pb.setGravity(0, 0, -9.81)
 
-        # Parameters
-        self.reset_joint_state = [0.0, -0.78, 0.0, -2.35, 0.0, 1.57, 0.78]
-        self.ee_id = 7  # kept for IK utility; NOT used in state
-        self.sat_val = 0.3
-        self.joint_low = np.array([-2.9, -1.8, -2.9, -3.0, -2.9, -0.08, -2.9], dtype=np.float32)
-        self.joint_high = np.array([2.9, 1.8, 2.9, 0.08, 2.9, 3.0, 2.9], dtype=np.float32)
-
-        # Joint-only state: 7 q + 7 dq = 14
-        self.Nstates = 14
+        # Dimensions
+        self.Nstates = 14  # 7 positions + 7 velocities
         self.udim = 7
+        self.n_joints = 7
+        self.sat_val = 1.0
 
-        self.dt = self.frame_skip * ts
-        self.uval = 0.12
-        self.env_name = env_name
+        # Random state
+        self.rng = np.random.default_rng(seed)
+        self.home_position = np.array([0.0, -0.78, 0.0, -2.35, 0.0, 1.57, 0.78], dtype=np.float32)
 
-        # Initialize state
-        self.state = None
         self.reset()
 
     def close(self):
@@ -326,95 +276,162 @@ class FrankaDataCollector(object):
             pass
 
     def reset(self):
-        for i, jnt in enumerate(self.reset_joint_state):
+        for i, jnt in enumerate(self.home_position):
             pb.resetJointState(self.robot, i, float(jnt))
         return self.get_state()
 
-    def reset_state(self, joint):
-        for i, jnt in enumerate(joint):
-            pb.resetJointState(self.robot, i, float(jnt))
+    def reset_state(self, joint_positions):
+        joint_positions = np.clip(joint_positions, self.JOINT_LOW, self.JOINT_HIGH)
+        for i in range(self.n_joints):
+            pb.resetJointState(self.robot, i, float(joint_positions[i]))
         return self.get_state()
+
+    def get_state(self):
+        """Get current state: [q(7), dq(7)] -> (14,)."""
+        jnt_st = pb.getJointStates(self.robot, range(self.n_joints))
+        q = np.array([s[0] for s in jnt_st], dtype=np.float32)
+        dq = np.array([s[1] for s in jnt_st], dtype=np.float32)
+        return np.concatenate([q, dq], axis=0)
 
     def step(self, action):
         a = np.clip(np.asarray(action, dtype=np.float32), -self.sat_val, self.sat_val)
         pb.setJointMotorControlArray(
-            self.robot,
-            range(7),
-            pb.VELOCITY_CONTROL,
+            self.robot, range(self.n_joints), pb.VELOCITY_CONTROL,
             targetVelocities=a.tolist(),
         )
         for _ in range(self.frame_skip):
             pb.stepSimulation()
         return self.get_state()
 
-    def get_ik(self, position, orientation=None):
-        """
-        Utility: IK is still available if you need it elsewhere.
-        This does NOT affect the collected state (which is joint-only).
-        """
-        if orientation is None:
-            jnts = pb.calculateInverseKinematics(self.robot, self.ee_id, position)[:7]
+    def _sample_initial_state(self):
+        """Sample random joint configuration within limits."""
+        margin = 0.3
+        return self.rng.uniform(
+            self.JOINT_LOW + margin, self.JOINT_HIGH - margin
+        ).astype(np.float32)
+
+    def _generate_goal_reaching(self, steps, current_pos):
+        """Minimum-jerk trajectory to random goal."""
+        margin = 0.3
+        goal = self.rng.uniform(
+            self.JOINT_LOW + margin, self.JOINT_HIGH - margin,
+            size=self.n_joints
+        )
+        displacement = goal - current_pos
+        T = steps * self.dt
+        velocities = np.zeros((steps, self.n_joints), dtype=np.float32)
+
+        for i in range(steps):
+            tau = (i + 0.5) * self.dt / T
+            s_dot = 30 * tau**2 - 60 * tau**3 + 30 * tau**4
+            velocities[i, :] = displacement * s_dot / T
+
+        return velocities
+
+    def _generate_smooth_random(self, steps):
+        """Ornstein-Uhlenbeck process for smooth random walk."""
+        theta = self.rng.uniform(0.2, 0.5)
+        sigma = self.rng.uniform(0.8, 1.5)
+        velocities = np.zeros((steps, self.n_joints), dtype=np.float32)
+        v = self.rng.uniform(-0.3, 0.3, size=self.n_joints).astype(np.float32)
+        sqrt_dt = np.sqrt(self.dt)
+
+        for i in range(steps):
+            dW = self.rng.standard_normal(self.n_joints).astype(np.float32) * sqrt_dt
+            v = v + theta * (0 - v) * self.dt + sigma * dW
+            velocities[i, :] = v
+
+        return velocities
+
+    def _generate_sinusoidal(self, steps):
+        """Multi-frequency sinusoidal oscillations."""
+        frequencies = self.rng.uniform(0.2, 1.5, size=self.n_joints)
+        amplitudes = self.rng.uniform(0.5, 1.5, size=self.n_joints)
+        phases = self.rng.uniform(0, 2 * np.pi, size=self.n_joints)
+        t = np.arange(steps) * self.dt
+        velocities = np.zeros((steps, self.n_joints), dtype=np.float32)
+
+        for j in range(self.n_joints):
+            velocities[:, j] = amplitudes[j] * np.sin(2 * np.pi * frequencies[j] * t + phases[j])
+
+        return velocities
+
+    def _scale_velocities(self, velocities):
+        """Scale velocities to target regime and clip to limits."""
+        regimes = list(self.VELOCITY_REGIMES.keys())
+        regime = self.rng.choice(regimes, p=self.REGIME_WEIGHTS)
+        v_min, v_max = self.VELOCITY_REGIMES[regime]
+        target_scale = self.rng.uniform(v_min, v_max)
+
+        current_max = np.max(np.abs(velocities))
+        if current_max > 1e-6:
+            velocities = velocities * (target_scale / current_max)
+
+        for j in range(self.n_joints):
+            velocities[:, j] = np.clip(
+                velocities[:, j], -self.VELOCITY_LIMITS[j], self.VELOCITY_LIMITS[j]
+            )
+        return velocities.astype(np.float32)
+
+    def _generate_trajectory(self, steps, current_pos):
+        """Generate velocity trajectory using one of 3 strategies."""
+        traj_type = self.rng.choice(
+            ['goal_reaching', 'smooth_random', 'sinusoidal'],
+            p=[0.40, 0.40, 0.20]
+        )
+
+        if traj_type == 'goal_reaching':
+            velocities = self._generate_goal_reaching(steps, current_pos)
+        elif traj_type == 'smooth_random':
+            velocities = self._generate_smooth_random(steps)
         else:
-            jnts = pb.calculateInverseKinematics(self.robot, self.ee_id, position, orientation)[:7]
-        return jnts
+            velocities = self._generate_sinusoidal(steps)
 
-    def get_state(self):
-        """
-        Joint-only state: [q(7), dq(7)] -> (14,)
-        """
-        jnt_st = pb.getJointStates(self.robot, range(7))
-        q = np.array([s[0] for s in jnt_st], dtype=np.float32)   # (7,)
-        dq = np.array([s[1] for s in jnt_st], dtype=np.float32)  # (7,)
-        self.state = np.concatenate([q, dq], axis=0)             # (14,)
-        return self.state.copy()
-
-    def Obs(self, o):
-        """
-        Identity mapping since get_state() already returns the desired observation.
-        """
-        return np.asarray(o, dtype=np.float32)
+        return self._scale_velocities(velocities)
 
     def collect_koopman_data(self, traj_num, steps):
         """
-        Collect random velocity-command rollouts.
+        Collect trajectory data for Koopman learning.
 
-        train_data[t, traj_i, :] = [u_t (7), x_t (14)]
+        Returns:
+            data: np.ndarray of shape (steps + 1, traj_num, 21)
+                  Format: [action(7), state(14)] at each timestep
         """
-        train_data = np.empty((steps + 1, traj_num, self.Nstates + self.udim), dtype=np.float32)
+        data = np.empty((steps + 1, traj_num, self.Nstates + self.udim), dtype=np.float32)
 
-        for traj_i in tqdm(range(traj_num)):
-            noise = (np.random.rand(7).astype(np.float32) - 0.5) * 2.0 * 0.2
-            joint_init = np.clip(np.array(self.reset_joint_state, dtype=np.float32) + noise,
-                                 self.joint_low, self.joint_high)
-            x = self.Obs(self.reset_state(joint_init))  # (14,)
+        for traj_i in tqdm(range(traj_num), desc="Collecting Franka trajectories"):
+            init_joints = self._sample_initial_state()
+            state = self.reset_state(init_joints)
+            velocities = self._generate_trajectory(steps, state[:self.n_joints])
 
-            u = (np.random.rand(7).astype(np.float32) - 0.5) * 2.0 * self.uval  # (7,)
-            train_data[0, traj_i, :] = np.concatenate([u, x], axis=0)
+            action = velocities[0] if len(velocities) > 0 else np.zeros(self.udim, dtype=np.float32)
+            data[0, traj_i, :] = np.concatenate([action, state])
 
             for t in range(1, steps + 1):
-                x = self.Obs(self.step(u))  # state after applying previous action
-                u = (np.random.rand(7).astype(np.float32) - 0.5) * 2.0 * self.uval
-                train_data[t, traj_i, :] = np.concatenate([u, x], axis=0)
+                state = self.step(action)
+                action = velocities[t] if t < steps else np.zeros(self.udim, dtype=np.float32)
+                data[t, traj_i, :] = np.concatenate([action, state])
 
-        return train_data
+        return data
 
 class G1Go2DataCollector():
     def __init__(self, env_name, use_initial_data=False):
         self.use_initial_data = use_initial_data
+        project_root = _get_project_root()
+
         if use_initial_data:
             g1_initial_path = 'None_trajnum90000_trajlen100'
             go2_initial_path = 'None_trajnum89947_trajlen100'
-            try:
-                if env_name == 'Go2':
-                    initial_dataset_path = f"../data/unitree_go2_flat/initial_dataset/{go2_initial_path}.npz"
-                elif env_name == 'G1':
-                    initial_dataset_path = f"../data/g1_flat/initial_dataset/{g1_initial_path}.npz"
-            except:
+            if env_name == 'Go2':
+                initial_dataset_path = os.path.join(project_root, "data", "unitree_go2_flat", "initial_dataset", f"{go2_initial_path}.npz")
+            elif env_name == 'G1':
+                initial_dataset_path = os.path.join(project_root, "data", "g1_flat", "initial_dataset", f"{g1_initial_path}.npz")
+            else:
                 raise ValueError("Dataset not found for the given environment.")
-            self.data_pathes = [initial_dataset_path]
+            self.data_paths = [initial_dataset_path]
         else:
-            self.data_pathes = []
-    
+            self.data_paths = []
+
         go2_tracking_path_0 = '2025-03-24-20-45-16_trajnum30000_trajlen15'
         go2_tracking_path_1 = '2025-03-24-21-14-03_trajnum30000_trajlen15'
         go2_tracking_path_2 = '2025-03-24-21-57-32_trajnum30000_trajlen15'
@@ -425,23 +442,23 @@ class G1Go2DataCollector():
         g1_tracking_path_3 = '2025-03-24-01-32-42_trajnum30000_trajlen15'
         g1_tracking_path_4 = '2025-03-24-02-38-25_trajnum30000_trajlen15'
         g1_tracking_path_5 = '2025-03-24-04-01-44_trajnum30000_trajlen15'
-        try:
-            if env_name == 'Go2':
-                tracking_dataset_path_0 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_0}.npz"
-                tracking_dataset_path_1 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_1}.npz"
-                tracking_dataset_path_2 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_2}.npz"
-                tracking_dataset_path_3 = f"../data/unitree_go2_flat/tracking_dataset/{go2_tracking_path_3}.npz"
-                # append new data paths
-                self.data_pathes = self.data_pathes + [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3]
-            elif env_name == 'G1':
-                tracking_dataset_path_0 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_0}.npz"
-                tracking_dataset_path_1 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_1}.npz"
-                tracking_dataset_path_2 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_2}.npz"
-                tracking_dataset_path_3 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_3}.npz"
-                tracking_dataset_path_4 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_4}.npz"
-                tracking_dataset_path_5 = f"../data/g1_flat/tracking_dataset/{g1_tracking_path_5}.npz"
-                self.data_pathes = self.data_pathes + [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3, tracking_dataset_path_4, tracking_dataset_path_5]
-        except:
+        if env_name == 'Go2':
+            go2_data_dir = os.path.join(project_root, "data", "unitree_go2_flat", "tracking_dataset")
+            tracking_dataset_path_0 = os.path.join(go2_data_dir, f"{go2_tracking_path_0}.npz")
+            tracking_dataset_path_1 = os.path.join(go2_data_dir, f"{go2_tracking_path_1}.npz")
+            tracking_dataset_path_2 = os.path.join(go2_data_dir, f"{go2_tracking_path_2}.npz")
+            tracking_dataset_path_3 = os.path.join(go2_data_dir, f"{go2_tracking_path_3}.npz")
+            self.data_paths = self.data_paths + [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3]
+        elif env_name == 'G1':
+            g1_data_dir = os.path.join(project_root, "data", "g1_flat", "tracking_dataset")
+            tracking_dataset_path_0 = os.path.join(g1_data_dir, f"{g1_tracking_path_0}.npz")
+            tracking_dataset_path_1 = os.path.join(g1_data_dir, f"{g1_tracking_path_1}.npz")
+            tracking_dataset_path_2 = os.path.join(g1_data_dir, f"{g1_tracking_path_2}.npz")
+            tracking_dataset_path_3 = os.path.join(g1_data_dir, f"{g1_tracking_path_3}.npz")
+            tracking_dataset_path_4 = os.path.join(g1_data_dir, f"{g1_tracking_path_4}.npz")
+            tracking_dataset_path_5 = os.path.join(g1_data_dir, f"{g1_tracking_path_5}.npz")
+            self.data_paths = self.data_paths + [tracking_dataset_path_0, tracking_dataset_path_1, tracking_dataset_path_2, tracking_dataset_path_3, tracking_dataset_path_4, tracking_dataset_path_5]
+        else:
             raise ValueError("Dataset not found for the given environment.")
     
     def get_data(self, data_paths, steps=15):
@@ -473,24 +490,25 @@ class G1Go2DataCollector():
         return combined_data
     
     def collect_koopman_data(self, traj_num, steps):
-        return self.get_data(self.data_pathes, steps)[:, :traj_num, :]
-    
+        return self.get_data(self.data_paths, steps)[:, :traj_num, :]
+
 class KinovaDataCollector():
     def __init__(self):
         self.state_dim = 14
         self.u_dim = 7
-        self.data_pathes = ['output_20250402_172619.txt',
+        self.data_paths = ['output_20250402_172619.txt',
                             'output_20250402_182836.txt',
                             'output_20250402_195709.txt',
                             'output_20250402_205831.txt',
                             'output_20250403_104412.txt']
-    
+
     def get_data(self, data_paths, steps=10):
+        kinova_data_dir = os.path.join(_get_project_root(), "data", "kinova_data")
         def process_data(file_path):
-            df = pd.read_csv(f'../data/kinova_data/{file_path}', 
-                        delimiter=' ', 
+            df = pd.read_csv(os.path.join(kinova_data_dir, file_path),
+                        delimiter=' ',
                         header=None,
-                        on_bad_lines='skip', 
+                        on_bad_lines='skip',
                         engine='python')
             arr = df.to_numpy()
             total_data = arr.shape[0]
@@ -503,7 +521,7 @@ class KinovaDataCollector():
         return np.concatenate(lst, axis=1)
 
     def collect_koopman_data(self, traj_num, steps):
-        return self.get_data(self.data_pathes, steps)[:, :traj_num, :]
+        return self.get_data(self.data_paths, steps)[:, :traj_num, :]
 
 def trim_robot_states(env_name, state_data, action_data):
     """
@@ -549,13 +567,16 @@ class KoopmanDatasetCollector():
         random.seed(seed)
 
         self.normalize = normalize
+        self.norm_stats = None
 
+        datasets_dir = os.path.join(_get_project_root(), "data", "datasets")
+        os.makedirs(datasets_dir, exist_ok=True)
         norm_str = "norm" if self.normalize else "nonorm"
         if env_name == "Polynomial":
-            data_path = f"../data/datasets/dataset_{env_name}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt"
+            data_path = os.path.join(datasets_dir, f"dataset_{env_name}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
         else:
-            data_path = f"../data/datasets/dataset_{env_name}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt"
-        
+            data_path = os.path.join(datasets_dir, f"dataset_{env_name}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
+
         self.u_dim = None
         self.state_dim = None
 
@@ -566,7 +587,7 @@ class KoopmanDatasetCollector():
             collector = LogisticMapDataCollector()
             self.state_dim = collector.state_dim
         elif env_name == "Franka":
-            collector = FrankaDataCollector()
+            collector = FrankaDataCollector(seed=seed)
             self.state_dim = collector.Nstates
             self.u_dim = collector.udim
         elif env_name == "DoublePendulum":
@@ -581,7 +602,6 @@ class KoopmanDatasetCollector():
             collector = G1Go2DataCollector(env_name, use_initial_data=True)
             self.full_state_dim = 87  # Original state dimension
             self.full_u_dim = 37      # Original action dimension
-            self.state_dim = 46       # Trimmed state dimension (23+23+1+6-6 = 47? Let's calculate properly)
             # G1 trimmed: 23 joint_pos + 23 joint_vel + 1 height + 6 root_state = 53
             self.state_dim = 53
             self.u_dim = 23           # Trimmed action dimension
@@ -601,6 +621,8 @@ class KoopmanDatasetCollector():
         
         if not os.path.exists(data_path):
             data = collector.collect_koopman_data(train_samples+val_samples+test_samples, Ksteps)
+            if hasattr(collector, 'close'):
+                collector.close()
             
             # Apply state trimming for G1 and Go2
             if env_name in ["G1", "Go2"]:

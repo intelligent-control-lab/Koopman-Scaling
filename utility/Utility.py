@@ -1,13 +1,20 @@
+"""
+DEPRECATED: This module is from the original DeepKoopmanWithControl project and is
+not used by the main training/evaluation pipeline (scripts/train_model.py, etc.).
+It is kept for reference only. Use utility/dataset.py for data collection instead.
+"""
+
 import numpy as np
-import gym
 import random
 from scipy.integrate import odeint
 import scipy.linalg
 from copy import copy
-from rbf import rbf
 from gym import spaces
-import sys
-sys.path.append("../franka")
+
+try:
+    from rbf import rbf
+except ImportError:
+    rbf = None
 #data collect
 
 class RBFLiftFunc():

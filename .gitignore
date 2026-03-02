@@ -1,3 +1,5 @@
 data/
 log/
 dataset.tar.gz
+control/logs
+*.pdf
