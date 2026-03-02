@@ -33,7 +33,7 @@ $$
 where $c$ is an environment-dependent constant. This predicts the minimum data needed for a given model size to achieve near-optimal error, and is validated empirically across all 8 environments.
 
 <p align="center">
-  <img src="figs/mlogn_error_vs_encode_dim_fit_by_coeff.png" width="600" alt="Scaling law fit: prediction error vs latent dimension"/>
+  <img src="figs/mlogn_error_vs_encode_dim_fit_by_coeff.png" width="700" alt="Scaling law fit: prediction error vs latent dimension"/>
 </p>
 
 ## Training Losses
