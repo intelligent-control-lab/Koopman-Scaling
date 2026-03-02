@@ -1,139 +1,106 @@
-# Koopman-Scaling
+# Scaling Law of Neural Koopman Operators
 
-Neural Koopman operator experiments for the scaling-law study in our paper.
+Abulikemu Abuduweili, Yuyang Pang, Feihan Li, Changliu Liu
+*arXiv preprint*, 2026 [[arXiv]](https://arxiv.org/abs/2602.19943)
 
-This repository includes:
-- data collection/loading pipelines for each environment,
-- model training and large hyperparameter sweeps,
-- Isaac Lab MPC tracking evaluation for `G1` and `Go2`,
-- notebooks to compute metrics and generate paper plots.
+## Introduction
 
-## Repository Structure
+Koopman operator theory lifts nonlinear dynamics $x_{t+1} = f(x_t, u_t)$ into a higher-dimensional space where the evolution is linear: a learned encoder $\varphi: \mathbb{R}^d \to \mathbb{R}^n$ maps the state to $z = \varphi(x)$ so that $z_{t+1} = Az_t + Bu_t$, enabling classical linear control (LQR, MPC) on complex nonlinear systems. **How do prediction and control errors scale with the latent dimension $n$ and the number of training samples $m$?** We study this across 8 nonlinear systems — pendulums, robot arms, humanoids, and quadrupeds — and establish a scaling law governing the data-model tradeoff.
 
-- `scripts/train_model.py`: main training entrypoint.
-- `scripts/run_experiments.sh`: full hyperparameter sweep used for scaling-law studies.
-- `scripts/run_corr_experiments.sh`: corrected `m = c * n * log(n)` sweep for `G1`/`Go2`.
-- `utility/dataset.py`: all dataset collectors and train/val/test construction.
-- `utility/network.py`: Koopman network architecture.
-- `control/mpc_tracking.py`: batch Isaac Lab tracking evaluation for `G1`/`Go2`.
-- `control/run_all_models.sh`: repeatedly calls tracking until all models are processed.
-- `evaluation/evaluate_prediction.ipynb`: prediction metrics/plots.
-- `evaluation/evaluate_tracking.ipynb`: tracking metrics/plots.
-- `evaluation/evaluate_correlation.ipynb`: scaling/correlation analysis.
-- `evaluation/evaluate_covariance.ipynb`: covariance-related analysis.
 
-## Environments and Data Sources
+<p align="center">
+  <img src="figs/Koopman_NN.png" width="450" alt="Neural Koopman architecture"/>
+</p>
 
-`utility/dataset.py` (`KoopmanDatasetCollector`) supports:
-- `Polynomial`: synthetic polynomial dynamics generated online (`PolynomialDataCollector`).
-- `LogisticMap`: synthetic logistic map generated online (`LogisticMapDataCollector`).
-- `DampingPendulum`: ODE rollouts with random torque (`DampingPendulumDataCollector`).
-- `DoublePendulum`: ODE rollouts with random torques (`DoublePendulumDataCollector`).
-- `Franka`: PyBullet rollouts of 7-DoF arm velocity control (`FrankaDataCollector`).
-- `Kinova`: loaded from logged files in `../data/kinova_data/` (`KinovaDataCollector`).
-- `G1`, `Go2`: loaded from pre-collected `.npz` datasets in `../data/g1_flat/` and `../data/unitree_go2_flat/` (`G1Go2DataCollector`).
+## Scaling Law (Corollary 1)
 
-For `G1`/`Go2`, raw robot states/actions are trimmed before training:
-- `G1`: state dim `53`, action dim `23`.
-- `Go2`: state dim `35`, action dim `12`.
+We prove that the prediction error of a neural Koopman model with latent dimension $n$ trained on $m$ samples is bounded by:
 
-Datasets are cached at:
-- `../data/datasets/dataset_<env>_<norm|nonorm>_... .pt`
+$$
+\epsilon(n, m) = \mathcal{O}\left(\sqrt{\frac{\ln n}{m}}\right) + \mathcal{O}\left(\frac{1}{n^{\alpha - 1/2}}\right)
+$$
 
-## Training Pipeline
 
-Run from `scripts/` (important because paths in code use `../...`):
+- **First term — statistical error**: decreases as the number of training samples $m$ grows. More data yields better generalization.
+- **Second term — approximation error**: decreases as the latent dimension $n$ increases. A larger latent space captures more of the true Koopman spectrum.
+
+The two terms reveal a **data-model tradeoff**: increasing $n$ reduces approximation error but inflates statistical error unless $m$ grows accordingly. Balancing the two terms gives the optimal scaling:
+
+$$
+m = c \cdot n \cdot \ln(n)
+$$
+
+where $c$ is an environment-dependent constant. This predicts the minimum data needed for a given model size to achieve near-optimal error, and is validated empirically across all 8 environments.
+
+<p align="center">
+  <img src="figs/mlogn_error_vs_encode_dim_fit_by_coeff.png" width="500" alt="Scaling law fit: prediction error vs latent dimension"/>
+</p>
+
+## Training Losses
+
+- **Multi-step prediction loss**: reconstruction error over $K$ future steps with discounted weighting.
+- **Inverse control loss**: reconstructs $u_t$ from consecutive latent states via the pseudo-inverse of $B$, preserving controllability.
+- **Covariance regularization**: penalizes off-diagonal latent covariance entries, encouraging decorrelated dimensions.
+
+## Citation
+
+```bibtex
+@article{abuduweili2026scaling,
+  title={Scaling Law of Neural Koopman Operators},
+  author={Abuduweili, Abulikemu and Pang, Yuyang and Li, Feihan and Liu, Changliu},
+  journal={arXiv preprint arXiv:2602.19943},
+  year={2026}
+}
+```
+
+## Installation
+
+Requirements: Python >= 3.8, PyTorch >= 1.12, NumPy, SciPy, pandas, tqdm. Optional: PyBullet (Franka env), wandb (tracking), Isaac Lab (MPC evaluation).
 
 ```bash
-cd scripts
-python train_model.py \
-  --project_name Sep_21 \
-  --env_name G1 \
-  --sample_size 64000 \
+pip install torch numpy scipy pandas pybullet tqdm
+```
+
+## Usage
+
+Train a Koopman model:
+
+```bash
+python scripts/train_model.py \
+  --env_name Franka \
+  --sample_size 60000 \
   --encode_dim 4 \
   --layer_depth 3 \
   --hidden_dim 256 \
-  --seed 17382 \
-  --m 0 \
   --use_residual \
   --use_control_loss \
-  --use_covariance_loss \
-  --multiply_encode_by_input_dim
+  --use_covariance_loss
 ```
 
-Main behavior (`scripts/train_model.py`):
-- Builds Koopman encoder + linear latent dynamics (`A`, `B`).
-- Trains with multi-step Koopman prediction loss.
-- Optionally adds control reconstruction loss and covariance regularization.
-- Uses env-specific defaults:
-  - `Ksteps=15` for most envs, `Ksteps=1` for `Polynomial`/`LogisticMap`.
-  - normalization enabled for `G1`/`Go2`, disabled otherwise.
-- Saves best checkpoint and appends one row to experiment CSV log.
+Models are saved to `log/<project>/best_models/`. Run `scripts/run_experiments.sh` for full hyperparameter sweeps, or `scripts/run_corr_experiments.sh` for the corrected $m = c \cdot n \cdot \ln(n)$ sweeps on G1/Go2. Evaluation notebooks in `evaluation/` reproduce all paper figures.
 
-Outputs:
-- models: `../log/<project_name>/best_models/<timestamp>_model_<env>.pth`
-- summary CSV: `../log/<project_name>/koopman_results_log.csv`
+## Repository Structure
 
-## Large-Scale Sweeps
-
-From `scripts/`:
-
-```bash
-bash run_experiments.sh
 ```
+scripts/
+  train_model.py              # Main training entrypoint
+  run_experiments.sh           # Full hyperparameter sweep
+  run_corr_experiments.sh      # Corrected scaling-law sweep for G1/Go2
 
-This script:
-- enumerates envs/seeds/encode dims/sample sizes/loss toggles,
-- skips completed runs by checking `koopman_results_log.csv`,
-- launches `train_model.py` for missing combinations only.
+utility/
+  dataset.py                   # Dataset collectors for all 8 environments
+  network.py                   # KoopmanNet architecture (encoder + linear dynamics)
+  lqr.py                       # LQR utilities
+  rbf.py                       # RBF basis functions
 
-Corrected scaling-law sweep (`G1`/`Go2` only):
+control/
+  mpc_tracking.py              # Isaac Lab MPC tracking evaluation for G1/Go2
 
-```bash
-bash run_corr_experiments.sh
+evaluation/
+  evaluate_prediction.ipynb    # Prediction metrics and plots
+  evaluate_tracking.ipynb      # Tracking metrics from Isaac MPC results
+  evaluate_correlation.ipynb   # Scaling law and correlation analysis
+  evaluate_covariance.ipynb    # Covariance-related analysis
+
+figs/                          # Paper figures
 ```
-
-In this script, sample size is computed as:
-- `m = coeff * n_eff * ln(n_eff)`
-- `n_eff = encode_dim_multiplier * state_dim(env)`
-
-## G1/Go2 Tracking Evaluation (Isaac Lab MPC)
-
-`control/mpc_tracking.py` evaluates trained models by running Koopman-MPC tracking in Isaac Lab and writing per-model metrics.
-
-Inputs:
-- model list from `../log/<project>/koopman_results_log.csv`
-- reference trajectories from `../data/g1_flat/reference_repository/` and `../data/unitree_go2_flat/reference_repository/`
-
-Run from `control/`:
-
-```bash
-cd control
-python mpc_tracking.py --headless \
-  --csv_log_path ../log/Sep_21/koopman_results_log.csv \
-  --save_path ../log/Sep_21/isaac_control_results.csv
-```
-
-Or process in resume loop:
-
-```bash
-bash run_all_models.sh
-```
-
-Tracking outputs:
-- `../log/<project>/isaac_control_results.csv`
-- Metrics include `mean_JrPE`, `mean_JrVE`, `mean_JrAE`, root errors, survival steps, and runtime.
-
-## Paper Plots and Metrics
-
-Use notebooks in `evaluation/` to compute and plot final paper results:
-- `evaluate_prediction.ipynb`: prediction performance summaries/plots.
-- `evaluate_tracking.ipynb`: tracking performance plots from Isaac MPC results.
-- `evaluate_correlation.ipynb`: correlation/scaling-law visualizations.
-- `evaluate_covariance.ipynb`: covariance-term analyses.
-
-## Notes
-
-- Required datasets are expected under `../data/...` relative to `scripts/` and `control/`.
-- Logs/checkpoints are written under `../log/...`.
-- For consistent paths, run scripts from their own directories (`scripts/`, `control/`).

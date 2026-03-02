@@ -12,7 +12,9 @@ import csv
 from datetime import datetime
 import argparse
 
-sys.path.append('../utility')
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.dirname(_script_dir)
+sys.path.insert(0, os.path.join(_project_root, 'utility'))
 from dataset import KoopmanDatasetCollector, KoopmanDataset
 from network import KoopmanNet
 
@@ -125,9 +127,9 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
         torch.cuda.manual_seed_all(seed)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    model_dir = f"../log/{project_name}/best_models/"
+    model_dir = os.path.join(_project_root, "log", project_name, "best_models")
     os.makedirs(model_dir, exist_ok=True)
-    csv_log_path = f"../log/{project_name}/koopman_results_log.csv"
+    csv_log_path = os.path.join(_project_root, "log", project_name, "koopman_results_log.csv")
 
     data_collector = KoopmanDatasetCollector(env_name, max_train_samples, val_samples, test_samples, Ksteps, normalize=normalize, m=m)
     Ktrain_data, Kval_data, Ktest_data = map(lambda x: torch.from_numpy(x).float(), data_collector.get_data())
@@ -309,7 +311,7 @@ def main():
 
     # --- Environment-specific logic from the original loop ---
     train_steps_map = {'G1': 20000, 'Go2': 20000, 'Franka': 60000, 'DoublePendulum': 60000,
-                       'DampingPendulum': 60000, 'Polynomial': 80000, 'Kinova': 60000}
+                       'DampingPendulum': 60000, 'Polynomial': 80000, 'LogisticMap': 80000, 'Kinova': 60000}
 
     if args.env_name in ['Polynomial', 'LogisticMap']:
         Ksteps = 1
