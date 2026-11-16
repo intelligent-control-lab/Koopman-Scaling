@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Kinova-only rerun after the window/split fix in utility/dataset.py (non-overlapping
-# consecutive windows, chronological train|val|test split). Results go to ../log/Kinova_v2.
+# consecutive windows, chronological train|val|test split). Results go to ../log/Kinova_v3 (full sweep, all four loss configurations).
 
 # =================================================================
 # == Hyperparameter Experiment Runner Script ==
