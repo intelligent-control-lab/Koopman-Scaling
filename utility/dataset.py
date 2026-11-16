@@ -496,6 +496,7 @@ class KinovaDataCollector():
     def __init__(self):
         self.state_dim = 14
         self.u_dim = 7
+        self.stride = 4   # window start spacing (rows); windows overlap within a split
         self.data_paths = ['output_20250402_172619.txt',
                             'output_20250402_182836.txt',
                             'output_20250402_195709.txt',
@@ -512,19 +513,22 @@ class KinovaDataCollector():
                         engine='python')
             arr = df.to_numpy()
             # Each file is one continuous recording (one row per control tick).
-            # Build non-overlapping windows of `steps + 1` consecutive rows
-            # (= `steps` transitions, as for the other environments), ordered in time.
+            # Build windows of `steps + 1` consecutive rows (= `steps` transitions,
+            # as for the other environments), starting every `self.stride` rows,
+            # ordered in time. Windows never cross file boundaries.
             window = steps + 1
-            num_windows = arr.shape[0] // window
-            trimmed = arr[:num_windows * window]
-            return trimmed.reshape(num_windows, window, arr.shape[1]).transpose(1, 0, 2)
+            starts = np.arange(0, arr.shape[0] - window + 1, self.stride)
+            idx = starts[None, :] + np.arange(window)[:, None]   # (window, num_windows)
+            return arr[idx]
         lst = []
         for path in data_paths:
             lst.append(process_data(path))
         return np.concatenate(lst, axis=1)
 
     def collect_koopman_data(self, traj_num, steps):
-        return self.get_data(self.data_paths, steps)[:, :traj_num, :]
+        # Return all windows in time order; the split is done chronologically
+        # by KoopmanDatasetCollector (see the Kinova branch there).
+        return self.get_data(self.data_paths, steps)
 
 def trim_robot_states(env_name, state_data, action_data):
     """
@@ -576,9 +580,9 @@ class KoopmanDatasetCollector():
         os.makedirs(datasets_dir, exist_ok=True)
         norm_str = "norm" if self.normalize else "nonorm"
         if env_name == "Polynomial":
-            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{'_v2' if env_name == 'Kinova' else ''}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
+            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{'_v3' if env_name == 'Kinova' else ''}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
         else:
-            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{'_v2' if env_name == 'Kinova' else ''}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
+            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{'_v3' if env_name == 'Kinova' else ''}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
 
         self.u_dim = None
         self.state_dim = None
@@ -656,14 +660,17 @@ class KoopmanDatasetCollector():
 
             if env_name == "Kinova":
                 # Kinova windows come from a few long recordings and are ordered in time.
-                # Use a chronological, block-wise split (train | val | test) so that
-                # temporally adjacent windows never appear in both training and test data;
-                # shuffle only within the training block.
-                n_total = train_samples + val_samples + test_samples
-                assert data.shape[1] >= n_total, f"Kinova has only {data.shape[1]} windows, requested {n_total}"
-                data = data[:, :n_total, :]
-                permutation = np.concatenate([np.random.permutation(train_samples),
-                                              np.arange(train_samples, n_total)])
+                # Chronological split: test = last block, val = block before it, train = rest.
+                # Windows overlapping a block boundary are dropped (gap), so no time step is
+                # shared between splits. Training windows are shuffled within the train block.
+                n_win = data.shape[1]
+                gap = int(np.ceil(data.shape[0] / collector.stride))
+                test_idx = np.arange(n_win - test_samples, n_win)
+                val_idx = np.arange(n_win - test_samples - gap - val_samples, n_win - test_samples - gap)
+                train_pool = np.arange(0, val_idx[0] - gap)
+                assert len(train_pool) >= train_samples, \
+                    f"Kinova: only {len(train_pool)} training windows available, requested {train_samples}"
+                permutation = np.concatenate([np.random.permutation(train_pool)[:train_samples], val_idx, test_idx])
             else:
                 permutation = np.random.permutation(data.shape[1])
             shuffled = data[:, permutation, :]
