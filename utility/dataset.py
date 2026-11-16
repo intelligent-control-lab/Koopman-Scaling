@@ -3,8 +3,12 @@ import numpy as np
 import os
 from torch.utils.data import Dataset
 import pandas as pd
-import pybullet as pb
-import pybullet_data
+try:  # PyBullet is only needed for the Franka environment
+    import pybullet as pb
+    import pybullet_data
+except ImportError:  # pragma: no cover
+    pb = None
+    pybullet_data = None
 from tqdm import tqdm
 from scipy.integrate import odeint
 import random
@@ -242,6 +246,8 @@ class FrankaDataCollector:
 
     def __init__(self, render=False, ts=0.002, seed=42):
         """Initialize Franka data collector with PyBullet simulation."""
+        if pb is None:
+            raise ImportError("The Franka environment requires PyBullet: pip install pybullet")
         self.frame_skip = 10
         self.dt = self.frame_skip * ts
         self.ts = ts

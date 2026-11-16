@@ -4,7 +4,6 @@ import torch.nn as nn
 import random
 import copy
 import itertools
-import wandb
 from torch.utils.data import DataLoader
 import os
 import sys
@@ -165,7 +164,8 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
 
     best_loss = 1e10
     val_losses = []
-    train_loader = DataLoader(KoopmanDataset(Ktrain_data), batch_size=batch_size, shuffle=True, pin_memory=True)
+    train_loader = DataLoader(KoopmanDataset(Ktrain_data), batch_size=batch_size, shuffle=True,
+                              pin_memory=torch.cuda.is_available())
     Kval_data = Kval_data.to(device)
     Ktest_data = Ktest_data.to(device)
     step = 0
@@ -208,7 +208,10 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
                     if val_loss < best_loss:
                         best_loss = val_loss
                         best_state_dict = copy.deepcopy(net.state_dict())
-                        best_model_path = os.path.join(model_dir, f"{timestamp}_model_{env_name}.pth")
+                        best_model_path = os.path.join(
+                            model_dir,
+                            f"{timestamp}_model_{env_name}_m{train_samples}_edim{actual_encode_dim}"
+                            f"_cov{int(use_covariance_loss)}_ctrl{int(use_control_loss)}_seed{seed}_pid{os.getpid()}.pth")
                         norm_stats = getattr(data_collector, "norm_stats", None)
                         torch.save({
                             'model': best_state_dict,
