@@ -12,7 +12,7 @@
 # =================================================================
 
 # --- Hyperparameter Definitions ---
-PROJECT_NAME="Kinova_v2"
+PROJECT_NAME="Kinova_v3"
 ENVS=("Kinova")
 SEEDS=(17382 76849 20965 84902 51194)
 ENCODE_DIMS=(1 2 4 8 16)
