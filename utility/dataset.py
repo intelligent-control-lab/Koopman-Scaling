@@ -511,10 +511,13 @@ class KinovaDataCollector():
                         on_bad_lines='skip',
                         engine='python')
             arr = df.to_numpy()
-            total_data = arr.shape[0]
-            trimmed_len = (total_data // steps) * steps
-            trimmed = arr[:trimmed_len]
-            return trimmed.reshape(steps, -1, arr.shape[1])
+            # Each file is one continuous recording (one row per control tick).
+            # Build non-overlapping windows of `steps + 1` consecutive rows
+            # (= `steps` transitions, as for the other environments), ordered in time.
+            window = steps + 1
+            num_windows = arr.shape[0] // window
+            trimmed = arr[:num_windows * window]
+            return trimmed.reshape(num_windows, window, arr.shape[1]).transpose(1, 0, 2)
         lst = []
         for path in data_paths:
             lst.append(process_data(path))
@@ -573,9 +576,9 @@ class KoopmanDatasetCollector():
         os.makedirs(datasets_dir, exist_ok=True)
         norm_str = "norm" if self.normalize else "nonorm"
         if env_name == "Polynomial":
-            data_path = os.path.join(datasets_dir, f"dataset_{env_name}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
+            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{'_v2' if env_name == 'Kinova' else ''}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
         else:
-            data_path = os.path.join(datasets_dir, f"dataset_{env_name}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
+            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{'_v2' if env_name == 'Kinova' else ''}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
 
         self.u_dim = None
         self.state_dim = None
@@ -651,7 +654,18 @@ class KoopmanDatasetCollector():
                     print(f"[INFO] Trimmed data shape: {data.shape}")
                     print(f"[INFO] New state_dim: {self.state_dim}, new u_dim: {self.u_dim}")
 
-            permutation = np.random.permutation(data.shape[1])
+            if env_name == "Kinova":
+                # Kinova windows come from a few long recordings and are ordered in time.
+                # Use a chronological, block-wise split (train | val | test) so that
+                # temporally adjacent windows never appear in both training and test data;
+                # shuffle only within the training block.
+                n_total = train_samples + val_samples + test_samples
+                assert data.shape[1] >= n_total, f"Kinova has only {data.shape[1]} windows, requested {n_total}"
+                data = data[:, :n_total, :]
+                permutation = np.concatenate([np.random.permutation(train_samples),
+                                              np.arange(train_samples, n_total)])
+            else:
+                permutation = np.random.permutation(data.shape[1])
             shuffled = data[:, permutation, :]
 
             train_data = shuffled[:, :train_samples, :]
