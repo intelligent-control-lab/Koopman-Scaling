@@ -14,6 +14,11 @@ from scipy.integrate import odeint
 import random
 
 
+# Bump when the data layout of an environment changes, so stale caches are not reused.
+# Kinova: consecutive windows + chronological split. Pendulums: input/state alignment fix.
+DATA_VERSION = {'Kinova': '_v3', 'DampingPendulum': '_v2', 'DoublePendulum': '_v2'}
+
+
 def _get_project_root():
     """Get absolute path to Koopman-Scaling project root."""
     # This file is in utility/, so project root is one level up
@@ -130,15 +135,15 @@ class DampingPendulumDataCollector:
         data = np.empty((steps + 1, traj_num, self.state_dim + self.u_dim),
                         dtype=np.float64)
 
+        # Row t stores [u_t, s_t], where u_t is the input applied at s_t to produce s_{t+1}
+        # (the convention used by the training losses). The input in the last row is unused.
         for traj in tqdm(range(traj_num)):
             s = self.random_state()
-            u = self.random_control()
-            data[0, traj, :] = np.concatenate([u, s])
-
-            for t in range(1, steps + 1):
+            for t in range(steps + 1):
                 u = self.random_control()
-                s = self.simulate_dynamics(s, u)
                 data[t, traj, :] = np.concatenate([u, s])
+                if t < steps:
+                    s = self.simulate_dynamics(s, u)
 
         return data
 
@@ -201,15 +206,15 @@ class DoublePendulumDataCollector:
         data = np.empty((steps + 1, traj_num, self.state_dim + self.u_dim),
                         dtype=np.float64)
 
+        # Row t stores [u_t, s_t], where u_t is the input applied at s_t to produce s_{t+1}
+        # (the convention used by the training losses). The input in the last row is unused.
         for traj in tqdm(range(traj_num)):
             s = self.random_state()
-            u = self.random_control()
-            data[0, traj, :] = np.concatenate([u, s])
-
-            for t in range(1, steps + 1):
+            for t in range(steps + 1):
                 u = self.random_control()
-                s = self.simulate_dynamics(s, u)
                 data[t, traj, :] = np.concatenate([u, s])
+                if t < steps:
+                    s = self.simulate_dynamics(s, u)
 
         return data
 
@@ -586,9 +591,9 @@ class KoopmanDatasetCollector():
         os.makedirs(datasets_dir, exist_ok=True)
         norm_str = "norm" if self.normalize else "nonorm"
         if env_name == "Polynomial":
-            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{'_v3' if env_name == 'Kinova' else ''}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
+            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{DATA_VERSION.get(env_name, '')}_{norm_str}_m_{m}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
         else:
-            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{'_v3' if env_name == 'Kinova' else ''}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
+            data_path = os.path.join(datasets_dir, f"dataset_{env_name}{DATA_VERSION.get(env_name, '')}_{norm_str}_Ktrain_{train_samples}_Kval_{val_samples}_Ktest_{test_samples}_Ksteps_{Ksteps}.pt")
 
         self.u_dim = None
         self.state_dim = None
