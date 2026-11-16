@@ -1,7 +1,7 @@
 # Scaling Law of Neural Koopman Operators
 
 Abulikemu Abuduweili, Yuyang Pang, Feihan Li, Changliu Liu, [Scaling Law of Neural Koopman Operators](https://arxiv.org/abs/2602.19943),
-*arXiv preprint*, 2026 · [Project page](https://walleclipse.github.io/Koopman-Scaling/)
+*arXiv preprint*, 2026 · [Project page](https://intelligent-control-lab.github.io/Koopman-Scaling/)
 
 ## Introduction
 
