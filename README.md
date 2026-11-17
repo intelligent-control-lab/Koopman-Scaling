@@ -88,6 +88,12 @@ Models are saved to `log/<project>/best_models/`, and every run appends one row 
 - `scripts/run_corr_experiments.sh`: coupled $m = c \cdot n \ln n$ sweeps on G1/Go2.
 - `scripts/run_kinova_v3_both.sh`: Kinova sweep with the corrected windows.
 
+Controlled pendulum study (paper Sec. 6.1.4 and appendix; runs on a CPU in about an hour):
+
+- `scripts/export_page_demo.py --grid`: data-size × latent-size grid; (A, B) refit by least squares on each model's own data.
+- `scripts/split_study.py`: the same grid with five seeds, plus a sample-split fit of (A, B) on disjoint windows. Writes `log/split_study.csv`.
+- `scripts/measure_leverage.py ..`: estimates the leverage constant κ_n of the grid models.
+
 The evaluation notebooks in `evaluation/` produce the paper figures from these logs.
 
 ## Repository Structure
@@ -98,6 +104,9 @@ scripts/
   run_experiments.sh          # Data-size x latent-dimension sweep
   run_corr_experiments.sh     # Coupled m = c n ln n sweep for G1/Go2
   run_kinova_v*.sh            # Kinova sweeps
+  export_page_demo.py         # Pendulum demo and grid models for the project page
+  split_study.py              # Five-seed, sample-split controlled study
+  measure_leverage.py         # Leverage constant of the grid models
 utility/
   dataset.py                  # Data collectors for all environments and the train/val/test split
   network.py                  # KoopmanNet (state-retaining encoder + linear latent dynamics)
@@ -118,3 +127,7 @@ figs/                         # Figures
   year={2026}
 }
 ```
+
+## License
+
+This code is released under the [MIT License](LICENSE).
