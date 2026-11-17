@@ -135,6 +135,14 @@ section.dark .note{color:rgba(245,245,247,.5)}
 #ex{width:100%}
 
 figure{margin:0}
+.grid-tbl{width:100%;border-collapse:separate;border-spacing:6px;font-size:13px}
+.grid-tbl th{font-weight:600;color:var(--ink-3);font-size:12px;text-align:center;padding:2px}
+.grid-tbl th.rowh{text-align:right;padding-right:8px;white-space:nowrap}
+.grid-tbl td{border-radius:12px;text-align:center;padding:12px 4px;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative}
+.grid-tbl td:hover{transform:scale(1.04)}
+.grid-tbl td.sel{box-shadow:0 0 0 3px var(--ink)}
+.grid-tbl td .best{position:absolute;top:3px;right:7px;font-size:11px}
+.seg.small button{padding:5px 11px}
 .fig{padding:20px}
 .fig img{margin:0 auto;border-radius:10px}
 figcaption{font-size:14px;color:var(--ink-2);padding:0 22px 22px;max-width:900px}
@@ -173,7 +181,7 @@ footer p{margin:0 0 6px}
   <div class="wrap">
     <a class="brand" href="#top">Koopman Scaling</a>
     <nav aria-label="Sections">
-      <a href="#predict">Predict</a><a href="#control">Control</a><a href="#law">Scaling law</a><a href="#method">Method</a><a href="#results">Results</a><a href="#citation">Cite</a>
+      <a href="#predict">Predict</a><a href="#control">Control</a><a href="#law">Scaling law</a><a href="#try">Try it</a><a href="#method">Method</a><a href="#results">Results</a><a href="#citation">Cite</a>
     </nav>
   </div>
 </header>
@@ -184,8 +192,8 @@ footer p{margin:0 0 6px}
   <canvas id="phase" aria-hidden="true"></canvas>
   <div class="wrap inner">
     <div class="eyebrow">Neural Koopman operators</div>
-    <h1>Scaling laws for <span class="grad">learning linear models</span> of nonlinear robots.</h1>
-    <p class="lead">A bigger latent space helps only when the data can support it. We show how much data a latent dimension needs, and how to scale the two together.</p>
+    <h1>Scaling Law of <span class="grad">Neural Koopman Operators</span></h1>
+    <p class="lead">Scaling laws for learning linear models of nonlinear robots. A bigger latent space helps only when the data can support it: we show how much data a latent dimension needs, and how to scale the two together.</p>
     <div class="authors">Abulikemu Abuduweili, Yuyang Pang, Feihan Li, and Changliu Liu</div>
     <div class="affil">Robotics Institute, Carnegie Mellon University</div>
     <div class="buttons">
@@ -325,7 +333,46 @@ footer p{margin:0 0 6px}
   </div>
 </section>
 
-<section id="method" class="gray">
+<section id="try" class="gray">
+  <div class="wrap">
+    <div class="text reveal">
+      <p class="kicker">Try it · Real models</p>
+      <h2>Pick the data. Pick the model.</h2>
+      <p class="sub">Twenty-one neural Koopman models of the pendulum, trained with the released code on 2 to 16,000 trajectories and three latent sizes. Each one forecasts live, and the grid shows what we measured. With very little data, the small model wins and the large one can even become unstable. From 20 trajectories on, the largest latent space is best. The best latent size grows with the data, as the scaling law predicts.</p>
+    </div>
+    <div class="card demo reveal">
+      <div class="demo-body">
+        <div class="stage"><canvas id="cv-try" role="img" aria-label="True pendulum and the forecast of the selected model"></canvas></div>
+        <div class="side">
+          <div class="controls">
+            <div><div style="font-size:12px;font-weight:600;color:var(--ink-3);margin-bottom:6px;letter-spacing:.04em">TRAINING DATA (TRAJECTORIES)</div>
+              <div class="seg small" id="try-m" role="group" aria-label="Training data size"></div></div>
+            <div><div style="font-size:12px;font-weight:600;color:var(--ink-3);margin-bottom:6px;letter-spacing:.04em">LATENT SIZE n</div>
+              <div class="seg small" id="try-n" role="group" aria-label="Latent size"></div></div>
+          </div>
+          <div class="controls"><label><input type="checkbox" id="try-all"> Also show the other latent sizes</label><button class="btn line" id="try-reset" style="padding:5px 12px;font-size:13px">New swing</button></div>
+          <canvas class="plot" id="pl-try" aria-label="Angle over time for the true pendulum and the forecasts"></canvas>
+          <div class="legend" id="try-legend"></div>
+          <div class="readouts">
+            <div class="ro"><div class="l">Live error</div><div class="n" id="rt-live">–</div></div>
+            <div class="ro"><div class="l">Measured, 1 s</div><div class="n" id="rt-1s">–</div></div>
+            <div class="ro"><div class="l">Measured, 2 s</div><div class="n" id="rt-2s">–</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:6px 22px 22px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin:14px 6px 2px">
+          <h3 style="margin:0;font-size:19px">Measured forecast error after 1 s (median angle error)</h3>
+          <span style="font-size:13px;color:var(--ink-3)">Click a cell to load that model · ★ best latent size for that data · ⚠ fewer transitions than n ln n</span>
+        </div>
+        <table class="grid-tbl" id="try-grid" aria-label="Measured forecast error for each data size and latent size"></table>
+      </div>
+    </div>
+    <p class="note">Each model is trained with <code>scripts/export_page_demo.py --grid</code> on swings within ±90°. Its linear model (<i>A</i>, <i>B</i>) is re-estimated by least squares on the same training trajectories, so every model uses exactly its data budget. Errors are medians over 300 held-out swings with the same random torques as the demo, one training seed per cell; the forecast restarts from the measured state every second. Each trajectory has 15 transitions.</p>
+  </div>
+</section>
+
+<section id="method">
   <div class="wrap">
     <div class="center text reveal" style="max-width:860px">
       <p class="kicker">Method</p>
@@ -555,13 +602,12 @@ $('m-sl').addEventListener('input', drawEx);
 window.addEventListener('resize', drawHeat);
 drawHeat(); drawEx();
 
-/* learned model, exported by scripts/export_page_demo.py */
-fetch('assets/demo_model.json').then(r => r.json()).then(MODEL => {
-  const n = MODEL.A.length, UMAX = MODEL.umax, s = MODEL.pred_err_deg;
-  if (s) $('err-stats').textContent = `${s['0.3s'][0].toFixed(1)}° after 0.3 s, ${s['1.0s'][0].toFixed(1)}° after 1 s, and ${s['2.0s'][0].toFixed(1)}° after 2 s`;
+/* shared: neural Koopman model (encoder + linear latent step) from exported JSON */
+function makeModel(M) {
+  const n = M.A.length;
   function encode(x) {
     let h = x.slice();
-    for (const b of MODEL.blocks) {
+    for (const b of M.blocks) {
       const out = new Array(b.W.length);
       for (let i = 0; i < b.W.length; i++) {
         let a = b.b[i]; const w = b.W[i]; for (let j = 0; j < h.length; j++) a += w[j] * h[j];
@@ -572,29 +618,37 @@ fetch('assets/demo_model.json').then(r => r.json()).then(MODEL => {
     }
     return x.concat(h);
   }
-  const lin = (z, u) => { const o = new Array(n); for (let i = 0; i < n; i++) { let a = MODEL.B[i] * u; const r = MODEL.A[i]; for (let j = 0; j < n; j++) a += r[j] * z[j]; o[i] = a; } return o; };
-
-  function drawPend(c, cx, cy, L, th, color, alpha, width, bob) {    /* angle 0 = hanging down */
-    const x = cx + L * Math.sin(th), y = cy + L * Math.cos(th);
-    c.globalAlpha = alpha; c.strokeStyle = color; c.lineWidth = width; c.lineCap = 'round';
-    c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
-    c.fillStyle = color; c.beginPath(); c.arc(x, y, bob, 0, 2 * Math.PI); c.fill(); c.globalAlpha = 1;
-  }
-  function drawPlot(cv, series, o) {
-    const { c, W, H } = fit(cv); c.clearRect(0, 0, W, H);
-    const pad = 10, y0 = H / 2, sy = (H / 2 - pad) / o.range;
-    c.strokeStyle = o.grid; c.lineWidth = 1; c.beginPath(); c.moveTo(pad, y0); c.lineTo(W - pad, y0); c.stroke();
-    for (const S of series) {
-      c.strokeStyle = S.color; c.lineWidth = S.width || 2; c.setLineDash(S.dash || []); c.beginPath();
-      const t0 = o.now - o.window; let pen = false;
-      for (const [t, v] of S.data) {
-        if (t < t0 || !isFinite(v)) { pen = false; continue; }
-        const x = pad + (t - t0) / o.window * (W - 2 * pad), y = y0 - Math.max(-o.range, Math.min(o.range, v * (S.scale || 1))) * sy;
-        pen ? c.lineTo(x, y) : c.moveTo(x, y); pen = true;
-      }
-      c.stroke(); c.setLineDash([]);
+  const lin = (z, u) => { const o = new Array(n); for (let i = 0; i < n; i++) { let a = M.B[i] * u; const r = M.A[i]; for (let j = 0; j < n; j++) a += r[j] * z[j]; o[i] = a; } return o; };
+  return { encode, lin, n };
+}
+function drawPend(c, cx, cy, L, th, color, alpha, width, bob) {    /* angle 0 = hanging down */
+  const x = cx + L * Math.sin(th), y = cy + L * Math.cos(th);
+  c.globalAlpha = alpha; c.strokeStyle = color; c.lineWidth = width; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
+  c.fillStyle = color; c.beginPath(); c.arc(x, y, bob, 0, 2 * Math.PI); c.fill(); c.globalAlpha = 1;
+}
+function drawPlot(cv, series, o) {
+  const { c, W, H } = fit(cv); c.clearRect(0, 0, W, H);
+  const pad = 10, y0 = H / 2, sy = (H / 2 - pad) / o.range;
+  c.strokeStyle = o.grid; c.lineWidth = 1; c.beginPath(); c.moveTo(pad, y0); c.lineTo(W - pad, y0); c.stroke();
+  for (const S of series) {
+    c.strokeStyle = S.color; c.lineWidth = S.width || 2; c.setLineDash(S.dash || []); c.beginPath();
+    const t0 = o.now - o.window; let pen = false;
+    for (const [t, v] of S.data) {
+      if (t < t0 || !isFinite(v)) { pen = false; continue; }
+      const x = pad + (t - t0) / o.window * (W - 2 * pad), y = y0 - Math.max(-o.range, Math.min(o.range, v * (S.scale || 1))) * sy;
+      pen ? c.lineTo(x, y) : c.moveTo(x, y); pen = true;
     }
+    c.stroke(); c.setLineDash([]);
   }
+}
+
+/* learned model, exported by scripts/export_page_demo.py */
+fetch('assets/demo_model.json').then(r => r.json()).then(MODEL => {
+  const n = MODEL.A.length, UMAX = MODEL.umax, s = MODEL.pred_err_deg;
+  if (s) $('err-stats').textContent = `${s['0.3s'][0].toFixed(1)}° after 0.3 s, ${s['1.0s'][0].toFixed(1)}° after 1 s, and ${s['2.0s'][0].toFixed(1)}° after 2 s`;
+  const { encode, lin } = makeModel(MODEL);
+
   const rnd = (a, b) => a + Math.random() * (b - a);
 
   /* prediction demo: the forecast restarts from the measured state every H seconds */
@@ -678,6 +732,92 @@ fetch('assets/demo_model.json').then(r => r.json()).then(MODEL => {
 }).catch(() => {
   ['cv-pred', 'cv-ctrl'].forEach(id => { const { c, W, H } = fit($(id)); c.fillStyle = '#86868b'; c.font = '15px -apple-system, system-ui, sans-serif'; c.textAlign = 'center'; c.fillText('Serve this page over HTTP to run the live demo.', W / 2, H / 2); });
 });
+/* ---------- try it: grid of real models (scripts/export_page_demo.py --grid) ---------- */
+fetch('assets/grid_models.json').then(r => r.json()).then(G => {
+  const UMAX = G.umax, DT = G.dt;
+  const models = G.models.map(M => Object.assign(makeModel(M), { m: M.m, nn: M.n, err: M.pred_err_deg }));
+  const MS = [...new Set(models.map(x => x.m))].sort((a, b) => a - b), NS = [...new Set(models.map(x => x.nn))].sort((a, b) => a - b);
+  const COL = ['#e8590c', '#6e56cf', '#0e9f8f'];
+  const colorOf = nn => COL[NS.indexOf(nn) % COL.length];
+  const get = (m, nn) => models.find(x => x.m === m && x.nn === nn);
+  const S = { m: MS.includes(20) ? 20 : MS[0], nn: NS[NS.length - 1], x: [0.8, 0], t: 0, t0: 0, k: 0, u: 0, zs: {}, trueS: [], fS: {} };
+  const mLabel = m => m >= 1000 ? (m / 1000) + 'k' : String(m);
+
+  function segButtons(box, vals, label, cur, on) {
+    box.innerHTML = '';
+    vals.forEach(v => { const b = document.createElement('button'); b.textContent = label(v); b.setAttribute('aria-pressed', String(v === cur)); b.onclick = () => on(v); box.appendChild(b); });
+  }
+  /* measured-error grid: rows = data size, columns = latent size */
+  const CAP = 90, cap = v => Math.min(CAP, v), show = v => v >= CAP ? '>' + CAP + '°' : v.toFixed(1) + '°';
+  const below = r => 15 * r.m < r.nn * Math.log(r.nn);     /* transitions < n ln n */
+  const vals = models.map(x => cap(x.err['1.0s'][0])), lo = Math.log(Math.min(...vals)), hi = Math.log(Math.max(...vals));
+  const shade = v => { const t = (Math.log(cap(v)) - lo) / Math.max(1e-9, hi - lo);
+    const a = [14, 159, 143], b = [255, 244, 236], c2 = [232, 89, 12];
+    const mix = (p, q, u) => p.map((x, i) => Math.round(x + (q[i] - x) * u));
+    return t < .5 ? mix(a, b, t * 2) : mix(b, c2, (t - .5) * 2); };
+  function buildGrid() {
+    const tbl = $('try-grid'); let h = '<tr><th></th>' + NS.map(nn => `<th>n = ${nn}</th>`).join('') + '</tr>';
+    for (const m of MS) {
+      const row = NS.map(nn => get(m, nn)); const best = Math.min(...row.map(r => r.err['1.0s'][0]));
+      h += `<tr><th class="rowh">${mLabel(m)} traj.</th>` + row.map(r => {
+        const v = r.err['1.0s'][0], c = shade(v), dark = (c[0] * .3 + c[1] * .59 + c[2] * .11) < 150;
+        return `<td data-m="${r.m}" data-n="${r.nn}" class="${r.m === S.m && r.nn === S.nn ? 'sel' : ''}" title="${15 * r.m} transitions; n ln n = ${Math.round(r.nn * Math.log(r.nn))}" style="background:rgb(${c.join(',')});color:${dark ? '#fff' : '#1d1d1f'}">${below(r) ? '⚠ ' : ''}${show(v)}${v === best ? '<span class="best">★</span>' : ''}</td>`;
+      }).join('') + '</tr>';
+    }
+    tbl.innerHTML = h;
+    tbl.querySelectorAll('td').forEach(td => td.onclick = () => select(+td.dataset.m, +td.dataset.n));
+  }
+  function restartForecasts() { S.t0 = S.t; for (const nn of NS) { S.zs[nn] = get(S.m, nn).encode(S.x); (S.fS[nn] = S.fS[nn] || []).push([S.t, NaN]); } }
+  function select(m, nn) {
+    const mChanged = m !== S.m; S.m = m; S.nn = nn;
+    segButtons($('try-m'), MS, mLabel, S.m, v => select(v, S.nn));
+    segButtons($('try-n'), NS, String, S.nn, v => select(S.m, v));
+    buildGrid();
+    if (mChanged) { S.fS = {}; }
+    restartForecasts();
+    const e = get(S.m, S.nn).err; $('rt-1s').textContent = show(e['1.0s'][0]); $('rt-2s').textContent = show(e['2.0s'][0]);
+    $('try-legend').innerHTML = '<span><span class="sw" style="border-color:#1d1d1f"></span>true angle</span>' +
+      NS.map(nn => `<span style="opacity:${nn === S.nn || $('try-all').checked ? 1 : .35}"><span class="sw" style="border-color:${colorOf(nn)}"></span>forecast, n = ${nn}${nn === S.nn ? ' (selected)' : ''}</span>`).join('');
+  }
+  $('try-all').addEventListener('change', () => select(S.m, S.nn));
+  $('try-reset').addEventListener('click', () => { S.x = [Math.random() * 2.6 - 1.3, Math.random() * 4 - 2]; S.trueS = []; S.fS = {}; restartForecasts(); });
+  select(S.m, S.nn);
+
+  function step() {
+    if (S.k % 10 === 0) S.u = (Math.random() * 2 - 1) * UMAX * 0.8;
+    S.x = stepPend(S.x, S.u); S.t += DT; S.k++;
+    for (const nn of NS) { S.zs[nn] = get(S.m, nn).lin(S.zs[nn], S.u); S.fS[nn].push([S.t, S.zs[nn][0]]); if (S.fS[nn].length > 480) S.fS[nn].shift(); }
+    S.trueS.push([S.t, S.x[0]]); if (S.trueS.length > 450) S.trueS.shift();
+    if (S.t - S.t0 >= 1 - 1e-9) restartForecasts();
+    if (Math.abs(S.x[0]) > 2.4) { S.x = [Math.random() * 2.6 - 1.3, Math.random() * 4 - 2]; restartForecasts(); }
+  }
+  function draw() {
+    const { c, W, H } = fit($('cv-try')); c.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H * 0.22, L = Math.min(W * 0.42, H * 0.55), all = $('try-all').checked;
+    c.strokeStyle = '#d2d2d7'; c.lineWidth = 2; c.beginPath(); c.moveTo(cx - 60, cy); c.lineTo(cx + 60, cy); c.stroke();
+    for (const nn of NS) if (nn !== S.nn && all) drawPend(c, cx, cy, L, S.zs[nn][0], colorOf(nn), 0.35, 8, 15);
+    drawPend(c, cx, cy, L, S.zs[S.nn][0], colorOf(S.nn), 0.55, 10, 18);
+    drawPend(c, cx, cy, L, S.x[0], '#1d1d1f', 1, 5, 13);
+    c.fillStyle = '#1d1d1f'; c.beginPath(); c.arc(cx, cy, 5, 0, 6.3); c.fill();
+    c.fillStyle = '#1d1d1f'; c.font = '700 15px -apple-system, system-ui, sans-serif'; c.textAlign = 'left';
+    c.fillText(`${mLabel(S.m)} trajectories · n = ${S.nn}`, 16, 28);
+    if (below(get(S.m, S.nn))) { c.fillStyle = '#d70015'; c.fillText('⚠ less data than n ln n: the estimate is unreliable', 16, H - 16); }
+    c.fillStyle = '#86868b'; c.font = '600 13px -apple-system, system-ui, sans-serif';
+    c.fillText(`forecast restarts every 1 s · ${Math.max(0, 1 - (S.t - S.t0)).toFixed(1)} s left`, 16, 48);
+    const series = [{ data: S.trueS, color: '#1d1d1f', width: 2.2 }];
+    for (const nn of NS) if (nn === S.nn || all) series.push({ data: S.fS[nn] || [], color: colorOf(nn), width: nn === S.nn ? 2.6 : 1.6 });
+    drawPlot($('pl-try'), series, { window: 6, now: S.t, range: 1.8, grid: '#ececf0' });
+    { const le = Math.abs(deg(S.zs[S.nn][0] - S.x[0])); $('rt-live').textContent = isFinite(le) && le < 180 ? le.toFixed(1) + '°' : '>180°'; }
+  }
+  let visible = false; new IntersectionObserver(es => { visible = es[0].isIntersecting; }, { threshold: 0.05 }).observe($('try'));
+  let last = 0, acc = 0;
+  function loop(ts) { if (!last) last = ts; acc += Math.min(0.1, (ts - last) / 1000); last = ts;
+    if (visible) { while (acc >= DT) { acc -= DT; step(); } draw(); } else acc = 0;
+    requestAnimationFrame(loop); }
+  if (reduce) { for (let i = 0; i < 120; i++) step(); draw(); } else requestAnimationFrame(loop);
+  window.addEventListener('resize', draw);
+}).catch(() => { const sec = $('try'); if (sec) sec.querySelector('.note').textContent = 'Serve this page over HTTP to load the trained models.'; });
+
 })();
 </script>
 </body>
