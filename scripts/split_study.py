@@ -56,7 +56,7 @@ def edmd(enc, windows):
 
 
 def main():
-    data = torch.load(glob.glob(os.path.join(HERE, "..", "data", "datasets", "*DampingPendulum*.pt"))[0],
+    data = torch.load(E.DATASET,
                       weights_only=False)
     all_windows = np.asarray(data["Ktrain_data"])
     done = set()

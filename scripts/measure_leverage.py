@@ -17,6 +17,7 @@ import torch
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "utility"))
+import export_page_demo as E  # noqa: E402
 from export_page_demo import load_net  # noqa: E402
 from split_study import SEEDS, SIZES, MULTS  # noqa: E402
 
@@ -24,7 +25,7 @@ LOG = os.path.join(HERE, "..", "log")
 
 
 def main():
-    data = torch.load(glob.glob(os.path.join(HERE, "..", "data", "datasets", "*DampingPendulum*.pt"))[0],
+    data = torch.load(E.DATASET,
                       weights_only=False)
     X = np.asarray(data["Ktrain_data"]).reshape(-1, 3)[:, 1:]       # states (theta, omega)
     X = X[np.random.default_rng(0).permutation(len(X))]

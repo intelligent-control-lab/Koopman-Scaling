@@ -34,6 +34,9 @@ from network import KoopmanNet  # noqa: E402
 
 G, B_DAMP, DT, UMAX = 9.8, 1.0, 0.02, 8.0
 PROJECT = "page_demo"
+# the +/-90 deg, 16k-trajectory dataset that train_model() writes (other pendulum caches may exist)
+DATASET = os.path.join(HERE, "..", "data", "datasets",
+                       "dataset_DampingPendulum_v2_nonorm_Ktrain_16000_Kval_2000_Ktest_2000_Ksteps_15.pt")
 
 
 def pendulum_step(x, u):
@@ -103,7 +106,7 @@ def run_grid(out_path, data_sizes=(2, 5, 20, 60, 250, 1000, 16000), mults=(1, 4,
                     train_model(project=project, train_samples=m, encode_dim=mult, train_steps=train_steps))
             net, sd, n = load_net(path)
             enc = lambda X: net.encode(torch.tensor(np.atleast_2d(X), dtype=torch.float32)).detach().numpy().astype(float)
-            data = torch.load(glob.glob(os.path.join(HERE, "..", "data", "datasets", "*DampingPendulum*.pt"))[0],
+            data = torch.load(DATASET,
                               weights_only=False)
             tr = np.asarray(data["Ktrain_data"])[:, :m]          # the same m windows the encoder was trained on
             Xu, Xn = tr[:-1].reshape(-1, 3), tr[1:].reshape(-1, 3)
