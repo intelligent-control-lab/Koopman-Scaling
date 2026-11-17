@@ -1,0 +1,112 @@
+#!/bin/bash
+# Validation-based tuning of the auxiliary-loss weights for the G1/Go2 closed-loop study.
+#
+# Protocol (both arms get the same tuning budget; nothing is selected on the test trajectories):
+#   Stage 1 (select): m = 140k windows, n_mult in {1,4,16}, 2 seeds.
+#     baseline : train_steps in {20k, 60k}
+#     +Both    : train_steps in {20k, 60k} x ctrl_loss_weight in {0.01, 0.1, 1} x cov_loss_weight in {0.1, 1}
+#     every model is evaluated with MPC input weight r in {0, 1e-3} on VALIDATION reference
+#     trajectories 1000-1499, which the paper never uses.
+#     select_aux_config.py picks, per arm, the setting with the highest mean validation survival.
+#   Stage 2 (final): the selected settings for Baseline, +Cov, +Ctrl, +Both (+Cov/+Ctrl use the selected
+#     weight of their own loss), full grid m x n_mult x 5 seeds, evaluated on the paper's TEST
+#     trajectories 0-999. Report every run.
+#
+# Usage (Linux + NVIDIA GPU + Isaac Lab; G1/Go2 data under data/):
+#   ENV=G1 bash run_aux_tuning.sh select     # stage 1: train + validation MPC
+#   python select_aux_config.py --env G1     # writes ../log/aux_tuning_<ENV>/selected.json
+#   ENV=G1 bash run_aux_tuning.sh final      # stage 2: train + test MPC
+# Set ISAAC_PY to the Isaac Lab python launcher if needed (e.g. ISAAC_PY="/path/isaaclab.sh -p").
+set -euo pipefail
+cd "$(dirname "$0")"
+ENV=${ENV:-G1}
+STAGE=${1:?usage: run_aux_tuning.sh select|final}
+ISAAC_PY=${ISAAC_PY:-python}
+ROOT=../log/aux_tuning_${ENV}
+mkdir -p "$ROOT"
+
+train() {  # project m n_mult seed steps use_cov use_ctrl w_cov w_ctrl
+  local flags=""
+  [ "$6" = 1 ] && flags="$flags --use_covariance_loss"
+  [ "$7" = 1 ] && flags="$flags --use_control_loss"
+  python train_model.py --project_name "$1" --env_name "$ENV" --sample_size "$2" --encode_dim "$3" \
+    --layer_depth 3 --hidden_dim 256 --seed "$4" --train_steps "$5" \
+    --cov_loss_weight "$8" --ctrl_loss_weight "$9" --use_residual --multiply_encode_by_input_dim $flags
+}
+
+already_trained() {  # project m n_mult seed
+  local log=../log/$1/koopman_results_log.csv
+  [ -f "$log" ] && python - "$log" "$2" "$3" "$4" <<'EOF'
+import sys, pandas as pd
+d = pd.read_csv(sys.argv[1])
+sys.exit(0 if ((d.train_samples == int(sys.argv[2])) & (d.encode_dim_param == int(sys.argv[3]))
+               & (d.seed == int(sys.argv[4]))).any() else 1)
+EOF
+}
+
+run_mpc() {  # models_csv out_csv traj_start r
+  (cd ../control && $ISAAC_PY mpc_tracking.py --headless --csv_log_path "$1" --save_path "$2" \
+     --traj_start "$3" --num_trajs "$([ "$3" = 0 ] && echo 1000 || echo 500)" --mpc_r "$4")
+}
+
+collect() {  # out_csv project...
+  local out=$1; shift
+  python - "$out" "$@" <<'EOF'
+import sys, os, pandas as pd
+frames = [pd.read_csv(f"../log/{p}/koopman_results_log.csv").assign(project=p)
+          for p in sys.argv[2:] if os.path.exists(f"../log/{p}/koopman_results_log.csv")]
+pd.concat(frames, ignore_index=True).to_csv(sys.argv[1], index=False)
+EOF
+}
+
+if [ "$STAGE" = select ]; then
+  projects=()
+  for steps in 20000 60000; do
+    p=aux_sel_${ENV}_base_s${steps}; projects+=("$p")
+    for wctrl in 0.01 0.1 1; do for wcov in 0.1 1; do
+      projects+=("aux_sel_${ENV}_both_s${steps}_c${wcov}_u${wctrl}")
+    done; done
+  done
+  for p in "${projects[@]}"; do
+    steps=$(echo "$p" | sed -E 's/.*_s([0-9]+).*/\1/')
+    for nm in 1 4 16; do for seed in 17382 76849; do
+      already_trained "$p" 140000 "$nm" "$seed" && continue
+      if [[ $p == *_base_* ]]; then
+        train "$p" 140000 "$nm" "$seed" "$steps" 0 0 1 1
+      else
+        wcov=$(echo "$p" | sed -E 's/.*_c([0-9.]+)_u.*/\1/'); wctrl=$(echo "$p" | sed -E 's/.*_u([0-9.]+)$/\1/')
+        train "$p" 140000 "$nm" "$seed" "$steps" 1 1 "$wcov" "$wctrl"
+      fi
+    done; done
+  done
+  collect "$ROOT/select_models.csv" "${projects[@]}"
+  for r in 0 0.001; do run_mpc "$(realpath "$ROOT/select_models.csv")" "$(realpath "$ROOT")/select_val_r${r}.csv" 1000 "$r"; done
+  echo "Now run: python select_aux_config.py --env $ENV"
+elif [ "$STAGE" = final ]; then
+  SEL=$ROOT/selected.json
+  [ -f "$SEL" ] || { echo "missing $SEL (run select_aux_config.py)"; exit 1; }
+  read -r BSTEPS ASTEPS WCOV WCTRL R < <(python -c "
+import json; s = json.load(open('$SEL'))
+print(s['baseline']['train_steps'], s['both']['train_steps'], s['both']['cov_loss_weight'],
+      s['both']['ctrl_loss_weight'], s['mpc_r'])")
+  projects=()
+  for arm in base cov ctrl both; do
+    p=aux_final_${ENV}_${arm}; projects+=("$p")
+    for m in 1000 4000 16000 64000 140000; do for nm in 1 2 4 8 16; do
+      for seed in 17382 76849 20965 84902 51194; do
+        already_trained "$p" "$m" "$nm" "$seed" && continue
+        case $arm in
+          base) train "$p" "$m" "$nm" "$seed" "$BSTEPS" 0 0 1 1 ;;
+          cov)  train "$p" "$m" "$nm" "$seed" "$ASTEPS" 1 0 "$WCOV" 1 ;;
+          ctrl) train "$p" "$m" "$nm" "$seed" "$ASTEPS" 0 1 1 "$WCTRL" ;;
+          both) train "$p" "$m" "$nm" "$seed" "$ASTEPS" 1 1 "$WCOV" "$WCTRL" ;;
+        esac
+      done
+    done; done
+  done
+  collect "$ROOT/final_models.csv" "${projects[@]}"
+  run_mpc "$(realpath "$ROOT/final_models.csv")" "$(realpath "$ROOT")/final_test.csv" 0 "$R"
+  echo "Test results: $ROOT/final_test.csv"
+else
+  echo "unknown stage $STAGE"; exit 1
+fi

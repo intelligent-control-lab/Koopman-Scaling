@@ -92,7 +92,9 @@ Controlled pendulum study (paper Sec. 6.1.4 and appendix; runs on a CPU in about
 
 - `scripts/export_page_demo.py --grid`: data-size × latent-size grid; (A, B) refit by least squares on each model's own data.
 - `scripts/split_study.py`: the same grid with five seeds, plus a sample-split fit of (A, B) on disjoint windows. Writes `log/split_study.csv`.
-- `scripts/measure_leverage.py ..`: estimates the leverage constant κ_n of the grid models.
+- `scripts/measure_leverage.py`: estimates the leverage constant κ_n of the controlled-study models.
+
+Auxiliary-loss tuning for G1/Go2 (needs Isaac Lab and a GPU): `scripts/run_aux_tuning.sh` selects the training steps, loss weights, and MPC input weight on validation reference trajectories (1000-1499), with the same budget for the baseline, then runs the full sweep on the test trajectories (0-999). See the header of the script for the protocol.
 
 The evaluation notebooks in `evaluation/` produce the paper figures from these logs.
 

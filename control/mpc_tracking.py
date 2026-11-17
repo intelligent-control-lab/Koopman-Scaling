@@ -26,6 +26,11 @@ parser.add_argument('--csv_log_path', type=str,
 parser.add_argument('--save_path', type=str,
     help='Output CSV for aggregated metrics')
 parser.add_argument('--start_idx', type=int, default=0, help='Start index (resume)')
+parser.add_argument('--traj_start', type=int, default=0,
+    help='First reference trajectory to track (the paper uses 0-999; use e.g. 1000 for a validation set)')
+parser.add_argument('--num_trajs', type=int, default=1000, help='Number of reference trajectories to track')
+parser.add_argument('--mpc_r', type=float, default=0.0,
+    help='Input weight R = mpc_r * I in the MPC cost (the paper uses 0)')
 args_cli = parser.parse_args()
 
 app_launcher = AppLauncher(args_cli)
@@ -172,7 +177,7 @@ def Torch_MPC(net, x_k_norm, X_ref_norm, H, m, latent_dim, s_dim):
 
     # Costs in latent space; penalize only the first s_dim (original state part)
     Q = torch.eye(latent_dim, device=device, dtype=torch.double)
-    R = torch.eye(m, device=device, dtype=torch.double) * 0.0
+    R = torch.eye(m, device=device, dtype=torch.double) * args_cli.mpc_r
     F = torch.eye(latent_dim, device=device, dtype=torch.double)
     Q[s_dim:, s_dim:] = 0.0
     F[s_dim:, s_dim:] = 0.0
@@ -244,8 +249,9 @@ def run_one_tracking(model_path, row):
         print(f"[ERROR] Missing reference: {ref_path}")
         return None
     ref_np = np.load(ref_path, allow_pickle=True)
-    state_data_raw  = torch.as_tensor(ref_np['state_data'], dtype=torch.double, device=device)
-    action_data_raw = torch.as_tensor(ref_np['action_data'], dtype=torch.double, device=device)
+    sl = slice(args_cli.traj_start, args_cli.traj_start + args_cli.num_trajs)
+    state_data_raw  = torch.as_tensor(ref_np['state_data'][:, sl], dtype=torch.double, device=device)
+    action_data_raw = torch.as_tensor(ref_np['action_data'][:, sl], dtype=torch.double, device=device)
     ref_data_raw = OrderedDict(state_data=state_data_raw, action_data=action_data_raw)
 
     # Trimmed reference for CONTROL path
@@ -268,7 +274,7 @@ def run_one_tracking(model_path, row):
     m_dim = net.lB.weight.shape[1]  # trimmed action dim used by the model
 
     # Build env
-    num_envs = min(state_data_raw.shape[1], 1000)
+    num_envs = state_data_raw.shape[1]
     env_cfg = parse_env_cfg(task, num_envs=num_envs)
     env_cfg.events.reset_base = EventTerm(func=reset_root_state_specific, mode="reset", params={})
     env_cfg.events.reset_robot_joints = EventTerm(func=reset_joints_specific, mode="reset", params={})
@@ -395,6 +401,9 @@ def run_one_tracking(model_path, row):
     return {
         'model_path': model_path,
         'robot': name,
+        'traj_start': args_cli.traj_start,
+        'num_trajs': num_envs,
+        'mpc_r': args_cli.mpc_r,
         'mean_JrPE': np.mean(JrPE_list),
         'mean_JrVE': np.mean(JrVE_list),
         'mean_JrAE': np.mean(JrAE_list),

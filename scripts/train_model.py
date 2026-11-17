@@ -267,6 +267,7 @@ def train(project_name, env_name, max_train_samples=140000, train_samples=140000
         "use_control_loss": use_control_loss,
         "use_covariance_loss": use_covariance_loss,
         "cov_loss_weight": cov_loss_weight,
+        "ctrl_loss_weight": ctrl_loss_weight,
         "all_loss": all_loss,
         "encode_dim_param": encode_dim,   # raw param passed in
         "encode_dim": actual_encode_dim,  # actual latent size used
@@ -303,6 +304,7 @@ def main():
     parser.add_argument('--m', type=int, default=100, help='Parameter m')
     parser.add_argument('--ctrl_loss_weight', type=float, default=1.0, help='Weight for control loss')
     parser.add_argument('--cov_loss_weight', type=float, default=1.0, help='Weight for covariance loss')
+    parser.add_argument('--train_steps', type=int, default=None, help='Training steps (default: per-environment value)')
 
     # Boolean flags: add them to the command if you want them to be True
     parser.add_argument('--use_residual', action='store_true', help='Use residual connections')
@@ -336,7 +338,7 @@ def main():
           val_samples=20000,
           test_samples=20000,
           Ksteps=Ksteps,
-          train_steps=train_steps_map.get(args.env_name, 60000),
+          train_steps=args.train_steps or train_steps_map.get(args.env_name, 60000),
           encode_dim=args.encode_dim,
           hidden_layers=args.layer_depth,
           hidden_dim=args.hidden_dim,
