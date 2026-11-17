@@ -1,0 +1,26 @@
+# Koopman scaling paper: validation-based tuning of the auxiliary losses on G1 (Isaac Lab closed loop).
+# Submit from the staged tree:  bolt task submit --tar . --config scripts/bolt/aux_g1.yaml \
+#   --update-config '{"environment_variables": {"STAGE": "smoke"}}'
+name: Koopman scaling G1 aux-loss tuning
+description: 'train_model.py + mpc_tracking.py (Isaac-Velocity-Flat-G1-v0); STAGE=smoke|select|final; results in artifacts/'
+tags:
+- koopman-scaling
+- g1
+command: 'bash scripts/bolt/run_aux_bolt.sh'
+project_id: phi_robotics
+priority: 2
+permissions:
+  viewers: phi-rob
+resources:
+  docker_image: docker.apple.com/phi-robotics/phimotion:isaacsim5.1
+  timeout: 1d
+  task_type: 1gpu
+  cluster: aws_4
+cluster_options:
+  aws:
+    instance_type: p5.48xlarge
+environment_variables:
+  ENV: G1
+  STAGE: smoke
+  ACCEPT_EULA: 'Y'
+  OMNI_KIT_ACCEPT_EULA: 'YES'

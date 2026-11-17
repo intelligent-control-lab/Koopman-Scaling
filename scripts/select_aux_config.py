@@ -20,14 +20,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--env", default="G1")
     root = os.path.join("..", "log", f"aux_tuning_{ap.parse_args().env}")
-    models = pd.read_csv(os.path.join(root, "select_models.csv"))
+    models = pd.concat([pd.read_csv(f) for f in sorted(glob.glob(os.path.join(root, "select_models*.csv")))],
+                       ignore_index=True)
     models["arm"] = models.project.str.contains("_both_").map({True: "both", False: "baseline"})
     if "ctrl_loss_weight" not in models:
         raise SystemExit("training logs lack ctrl_loss_weight; use the current train_model.py")
     keys = ["arm", "train_steps", "cov_loss_weight", "ctrl_loss_weight"]
     tables = []
-    for f in sorted(glob.glob(os.path.join(root, "select_val_r*.csv"))):
-        res = pd.read_csv(f).merge(models[["model_path"] + keys + ["encode_dim_param", "seed"]], on="model_path")
+    val = pd.concat([pd.read_csv(f) for f in sorted(glob.glob(os.path.join(root, "select_val_r*.csv")))],
+                    ignore_index=True)
+    for _, part in val.groupby("mpc_r"):
+        res = part.merge(models[["model_path"] + keys + ["encode_dim_param", "seed"]], on="model_path")
         res.loc[res.arm == "baseline", ["cov_loss_weight", "ctrl_loss_weight"]] = float("nan")
         g = (res.groupby(keys + ["mpc_r"], dropna=False)
                 .agg(val_survival=("mean_survival_steps", "mean"), runs=("mean_survival_steps", "size"))

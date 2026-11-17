@@ -14,14 +14,16 @@
 #
 # Usage (Linux + NVIDIA GPU + Isaac Lab; G1/Go2 data under data/):
 #   ENV=G1 bash run_aux_tuning.sh select     # stage 1: train + validation MPC
-#   python select_aux_config.py --env G1     # writes ../log/aux_tuning_<ENV>/selected.json
+#   python select_aux_config.py --env G1     # merges the shard CSVs, writes ../log/aux_tuning_<ENV>/selected.json
+# Optional: PARALLEL=k concurrent trainings; SHARD=i NSHARDS=k to split a stage over k tasks.
 #   ENV=G1 bash run_aux_tuning.sh final      # stage 2: train + test MPC
-# Set ISAAC_PY to the Isaac Lab python launcher if needed (e.g. ISAAC_PY="/path/isaaclab.sh -p").
+# Set PY (training) and ISAAC_PY (MPC) to the right interpreters if needed (e.g. ISAAC_PY="/path/isaaclab.sh -p").
 set -euo pipefail
 cd "$(dirname "$0")"
 ENV=${ENV:-G1}
 STAGE=${1:?usage: run_aux_tuning.sh select|final}
-ISAAC_PY=${ISAAC_PY:-python}
+PY=${PY:-python}
+ISAAC_PY=${ISAAC_PY:-$PY}
 ROOT=../log/aux_tuning_${ENV}
 mkdir -p "$ROOT"
 
@@ -29,14 +31,31 @@ train() {  # project m n_mult seed steps use_cov use_ctrl w_cov w_ctrl
   local flags=""
   [ "$6" = 1 ] && flags="$flags --use_covariance_loss"
   [ "$7" = 1 ] && flags="$flags --use_control_loss"
-  python train_model.py --project_name "$1" --env_name "$ENV" --sample_size "$2" --encode_dim "$3" \
+  $PY train_model.py --project_name "$1" --env_name "$ENV" --sample_size "$2" --encode_dim "$3" \
     --layer_depth 3 --hidden_dim 256 --seed "$4" --train_steps "$5" \
-    --cov_loss_weight "$8" --ctrl_loss_weight "$9" --use_residual --multiply_encode_by_input_dim $flags
+    --cov_loss_weight "$8" --ctrl_loss_weight "$9" --use_residual --multiply_encode_by_input_dim $flags \
+    > "../log/$1.train.txt" 2>&1 || echo "[train] FAILED: $1 (see log/$1.train.txt)"
+}
+
+# Run up to PARALLEL trainings at once; each run has its own project directory (no shared log file).
+PARALLEL=${PARALLEL:-1}
+# SHARD/NSHARDS split the runs of a stage across Bolt tasks (run index modulo NSHARDS).
+SHARD=${SHARD:-0}; NSHARDS=${NSHARDS:-1}; RUN_IDX=0
+MY_PROJECTS=()
+queue() {  # project_prefix m n_mult seed steps use_cov use_ctrl w_cov w_ctrl
+  local p="$1__m$2_nm$3_s$4"
+  RUN_IDX=$((RUN_IDX + 1))
+  [ $(((RUN_IDX - 1) % NSHARDS)) -eq "$SHARD" ] || return 0
+  MY_PROJECTS+=("$p")
+  already_trained "$p" "$2" "$3" "$4" && return 0
+  while [ "$(jobs -rp | wc -l)" -ge "$PARALLEL" ]; do sleep 5; done
+  echo "[train] $p"
+  train "$p" "${@:2}" &
 }
 
 already_trained() {  # project m n_mult seed
   local log=../log/$1/koopman_results_log.csv
-  [ -f "$log" ] && python - "$log" "$2" "$3" "$4" <<'EOF'
+  [ -f "$log" ] && $PY - "$log" "$2" "$3" "$4" <<'EOF'
 import sys, pandas as pd
 d = pd.read_csv(sys.argv[1])
 sys.exit(0 if ((d.train_samples == int(sys.argv[2])) & (d.encode_dim_param == int(sys.argv[3]))
@@ -51,9 +70,9 @@ run_mpc() {  # models_csv out_csv traj_start r
 
 collect() {  # out_csv project...
   local out=$1; shift
-  python - "$out" "$@" <<'EOF'
+  $PY - "$out" "$@" <<'EOF'
 import sys, os, pandas as pd
-frames = [pd.read_csv(f"../log/{p}/koopman_results_log.csv").assign(project=p)
+frames = [pd.read_csv(f"../log/{p}/koopman_results_log.csv").assign(project=p.split("__")[0])
           for p in sys.argv[2:] if os.path.exists(f"../log/{p}/koopman_results_log.csv")]
 pd.concat(frames, ignore_index=True).to_csv(sys.argv[1], index=False)
 EOF
@@ -70,22 +89,22 @@ if [ "$STAGE" = select ]; then
   for p in "${projects[@]}"; do
     steps=$(echo "$p" | sed -E 's/.*_s([0-9]+).*/\1/')
     for nm in 1 4 16; do for seed in 17382 76849; do
-      already_trained "$p" 140000 "$nm" "$seed" && continue
       if [[ $p == *_base_* ]]; then
-        train "$p" 140000 "$nm" "$seed" "$steps" 0 0 1 1
+        queue "$p" 140000 "$nm" "$seed" "$steps" 0 0 1 1
       else
         wcov=$(echo "$p" | sed -E 's/.*_c([0-9.]+)_u.*/\1/'); wctrl=$(echo "$p" | sed -E 's/.*_u([0-9.]+)$/\1/')
-        train "$p" 140000 "$nm" "$seed" "$steps" 1 1 "$wcov" "$wctrl"
+        queue "$p" 140000 "$nm" "$seed" "$steps" 1 1 "$wcov" "$wctrl"
       fi
     done; done
   done
-  collect "$ROOT/select_models.csv" "${projects[@]}"
-  for r in 0 0.001; do run_mpc "$(realpath "$ROOT/select_models.csv")" "$(realpath "$ROOT")/select_val_r${r}.csv" 1000 "$r"; done
+  wait
+  collect "$ROOT/select_models_${SHARD}.csv" "${MY_PROJECTS[@]}"
+  for r in 0 0.001; do run_mpc "$(realpath "$ROOT/select_models_${SHARD}.csv")" "$(realpath "$ROOT")/select_val_r${r}_${SHARD}.csv" 1000 "$r"; done
   echo "Now run: python select_aux_config.py --env $ENV"
 elif [ "$STAGE" = final ]; then
   SEL=$ROOT/selected.json
   [ -f "$SEL" ] || { echo "missing $SEL (run select_aux_config.py)"; exit 1; }
-  read -r BSTEPS ASTEPS WCOV WCTRL R < <(python -c "
+  read -r BSTEPS ASTEPS WCOV WCTRL R < <($PY -c "
 import json; s = json.load(open('$SEL'))
 print(s['baseline']['train_steps'], s['both']['train_steps'], s['both']['cov_loss_weight'],
       s['both']['ctrl_loss_weight'], s['mpc_r'])")
@@ -94,19 +113,19 @@ print(s['baseline']['train_steps'], s['both']['train_steps'], s['both']['cov_los
     p=aux_final_${ENV}_${arm}; projects+=("$p")
     for m in 1000 4000 16000 64000 140000; do for nm in 1 2 4 8 16; do
       for seed in 17382 76849 20965 84902 51194; do
-        already_trained "$p" "$m" "$nm" "$seed" && continue
         case $arm in
-          base) train "$p" "$m" "$nm" "$seed" "$BSTEPS" 0 0 1 1 ;;
-          cov)  train "$p" "$m" "$nm" "$seed" "$ASTEPS" 1 0 "$WCOV" 1 ;;
-          ctrl) train "$p" "$m" "$nm" "$seed" "$ASTEPS" 0 1 1 "$WCTRL" ;;
-          both) train "$p" "$m" "$nm" "$seed" "$ASTEPS" 1 1 "$WCOV" "$WCTRL" ;;
+          base) queue "$p" "$m" "$nm" "$seed" "$BSTEPS" 0 0 1 1 ;;
+          cov)  queue "$p" "$m" "$nm" "$seed" "$ASTEPS" 1 0 "$WCOV" 1 ;;
+          ctrl) queue "$p" "$m" "$nm" "$seed" "$ASTEPS" 0 1 1 "$WCTRL" ;;
+          both) queue "$p" "$m" "$nm" "$seed" "$ASTEPS" 1 1 "$WCOV" "$WCTRL" ;;
         esac
       done
     done; done
   done
-  collect "$ROOT/final_models.csv" "${projects[@]}"
-  run_mpc "$(realpath "$ROOT/final_models.csv")" "$(realpath "$ROOT")/final_test.csv" 0 "$R"
-  echo "Test results: $ROOT/final_test.csv"
+  wait
+  collect "$ROOT/final_models_${SHARD}.csv" "${MY_PROJECTS[@]}"
+  run_mpc "$(realpath "$ROOT/final_models_${SHARD}.csv")" "$(realpath "$ROOT")/final_test_${SHARD}.csv" 0 "$R"
+  echo "Test results: $ROOT/final_test_${SHARD}.csv"
 else
   echo "unknown stage $STAGE"; exit 1
 fi
