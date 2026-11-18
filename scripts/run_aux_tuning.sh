@@ -41,17 +41,18 @@ train() {  # project m n_mult seed steps use_cov use_ctrl w_cov w_ctrl [gpu]
 # NGPU > 1 spreads trainings and MPC chunks over the GPUs of one node.
 PARALLEL=${PARALLEL:-1}; NGPU=${NGPU:-1}
 # SHARD/NSHARDS split the runs of a stage across Bolt tasks (run index modulo NSHARDS).
-SHARD=${SHARD:-0}; NSHARDS=${NSHARDS:-1}; RUN_IDX=0
+SHARD=${SHARD:-0}; NSHARDS=${NSHARDS:-1}; RUN_IDX=0; MY_IDX=0
 MY_PROJECTS=()
 queue() {  # project_prefix m n_mult seed steps use_cov use_ctrl w_cov w_ctrl
   local p="$1__m$2_nm$3_s$4"
   RUN_IDX=$((RUN_IDX + 1))
   [ $(((RUN_IDX - 1) % NSHARDS)) -eq "$SHARD" ] || return 0
   MY_PROJECTS+=("$p")
+  MY_IDX=$((MY_IDX + 1))
   already_trained "$p" "$2" "$3" "$4" && return 0
   while [ "$(jobs -rp | wc -l)" -ge "$PARALLEL" ]; do sleep 5; done
-  echo "[train] $p (gpu $(( RUN_IDX % NGPU )))"
-  train "$p" "${@:2}" $(( RUN_IDX % NGPU )) &
+  echo "[train] $p (gpu $(( MY_IDX % NGPU )))"
+  train "$p" "${@:2}" $(( MY_IDX % NGPU )) &
 }
 
 already_trained() {  # project m n_mult seed
