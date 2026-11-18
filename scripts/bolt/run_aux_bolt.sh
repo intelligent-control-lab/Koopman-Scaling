@@ -21,8 +21,23 @@ NCPU=$(nproc 2>/dev/null || echo 24); P=${PARALLEL:-1}
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-$(( NCPU / P > 1 ? NCPU / P : 1 ))}
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
 echo "[bolt] PARALLEL=$P NGPU=${NGPU:-1} OMP_NUM_THREADS=$OMP_NUM_THREADS"
+# ---- Preemption tolerance: restore ../log from the Bolt checkpoint, and checkpoint it every CKPT_MIN minutes.
+CK="${BOLT_CHECKPOINT_DIR:-}"
+if [ -n "$CK" ] && [ -f "$CK/log.tar" ]; then
+  echo "[bolt] restoring log/ from checkpoint ($(du -h "$CK/log.tar" | cut -f1))"
+  mkdir -p ../log && tar -xf "$CK/log.tar" -C ..
+fi
+if [ -n "$CK" ]; then
+  "$PY" -c "import apple_bolt" 2>/dev/null || "$PY" -m pip install -q apple-bolt --index-url https://pypi.apple.com/simple >/dev/null 2>&1
+  ( while sleep $(( ${CKPT_MIN:-15} * 60 + 1 )); do
+      tar -cf "$CK/log.tar.tmp" -C .. log 2>/dev/null && mv "$CK/log.tar.tmp" "$CK/log.tar" \
+        && "$PY" -c "import apple_bolt; apple_bolt.checkpoint()" >/dev/null 2>&1 \
+        && echo "[bolt] checkpoint saved $(date +%H:%M)"
+    done ) > /dev/null 2>&1 &
+  CKPT_PID=$!
+fi
 sync_out() { mkdir -p "$ART"; cp -r ../log/aux_tuning_* "$ART"/ 2>/dev/null; for d in ../log/aux_*_"$ENV"_*; do [ -d "$d" ] && mkdir -p "$ART/runs" && cp -r "$d" "$ART/runs/"; done; }
-trap sync_out EXIT
+trap '[ -n "${CKPT_PID:-}" ] && kill $CKPT_PID 2>/dev/null; sync_out' EXIT
 if [ "$STAGE" = smoke ]; then
   P=aux_smoke_${ENV}
   "$PY" train_model.py --project_name $P --env_name "$ENV" --sample_size 1000 --encode_dim 1 --layer_depth 3 \
