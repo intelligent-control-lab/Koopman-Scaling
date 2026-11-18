@@ -16,6 +16,11 @@ done
 echo "[bolt] python: $PY"; "$PY" -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
 "$PY" -c "import isaaclab, isaaclab_tasks; print('isaaclab ok')" || echo "[bolt] WARNING: isaaclab import failed"
 export PY ISAAC_PY="$PY" ENV
+# Limit CPU threads per process so that parallel trainings do not compete for all cores.
+NCPU=$(nproc 2>/dev/null || echo 24); P=${PARALLEL:-1}
+export OMP_NUM_THREADS=${OMP_NUM_THREADS:-$(( NCPU / P > 1 ? NCPU / P : 1 ))}
+export MKL_NUM_THREADS=$OMP_NUM_THREADS
+echo "[bolt] PARALLEL=$P NGPU=${NGPU:-1} OMP_NUM_THREADS=$OMP_NUM_THREADS"
 sync_out() { mkdir -p "$ART"; cp -r ../log/aux_tuning_* "$ART"/ 2>/dev/null; for d in ../log/aux_*_"$ENV"_*; do [ -d "$d" ] && mkdir -p "$ART/runs" && cp -r "$d" "$ART/runs/"; done; }
 trap sync_out EXIT
 if [ "$STAGE" = smoke ]; then

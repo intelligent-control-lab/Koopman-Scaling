@@ -27,18 +27,19 @@ ISAAC_PY=${ISAAC_PY:-$PY}
 ROOT=../log/aux_tuning_${ENV}
 mkdir -p "$ROOT"
 
-train() {  # project m n_mult seed steps use_cov use_ctrl w_cov w_ctrl
-  local flags=""
+train() {  # project m n_mult seed steps use_cov use_ctrl w_cov w_ctrl [gpu]
+  local flags="" gpu=${10:-0}
   [ "$6" = 1 ] && flags="$flags --use_covariance_loss"
   [ "$7" = 1 ] && flags="$flags --use_control_loss"
-  $PY train_model.py --project_name "$1" --env_name "$ENV" --sample_size "$2" --encode_dim "$3" \
+  CUDA_VISIBLE_DEVICES=$gpu $PY train_model.py --project_name "$1" --env_name "$ENV" --sample_size "$2" --encode_dim "$3" \
     --layer_depth 3 --hidden_dim 256 --seed "$4" --train_steps "$5" \
     --cov_loss_weight "$8" --ctrl_loss_weight "$9" --use_residual --multiply_encode_by_input_dim $flags \
     > "../log/$1.train.txt" 2>&1 || echo "[train] FAILED: $1 (see log/$1.train.txt)"
 }
 
 # Run up to PARALLEL trainings at once; each run has its own project directory (no shared log file).
-PARALLEL=${PARALLEL:-1}
+# NGPU > 1 spreads trainings and MPC chunks over the GPUs of one node.
+PARALLEL=${PARALLEL:-1}; NGPU=${NGPU:-1}
 # SHARD/NSHARDS split the runs of a stage across Bolt tasks (run index modulo NSHARDS).
 SHARD=${SHARD:-0}; NSHARDS=${NSHARDS:-1}; RUN_IDX=0
 MY_PROJECTS=()
@@ -49,8 +50,8 @@ queue() {  # project_prefix m n_mult seed steps use_cov use_ctrl w_cov w_ctrl
   MY_PROJECTS+=("$p")
   already_trained "$p" "$2" "$3" "$4" && return 0
   while [ "$(jobs -rp | wc -l)" -ge "$PARALLEL" ]; do sleep 5; done
-  echo "[train] $p"
-  train "$p" "${@:2}" &
+  echo "[train] $p (gpu $(( RUN_IDX % NGPU )))"
+  train "$p" "${@:2}" $(( RUN_IDX % NGPU )) &
 }
 
 already_trained() {  # project m n_mult seed
@@ -63,9 +64,29 @@ sys.exit(0 if ((d.train_samples == int(sys.argv[2])) & (d.encode_dim_param == in
 EOF
 }
 
-run_mpc() {  # models_csv out_csv traj_start r
-  (cd ../control && $ISAAC_PY mpc_tracking.py --headless --csv_log_path "$1" --save_path "$2" \
-     --traj_start "$3" --num_trajs "$([ "$3" = 0 ] && echo 1000 || echo 500)" --mpc_r "$4")
+run_mpc() {  # models_csv out_csv traj_start r  (with NGPU > 1: one chunk of models per GPU, in parallel)
+  local nt; nt=$([ "$3" = 0 ] && echo 1000 || echo 500)
+  if [ "$NGPU" -le 1 ]; then
+    (cd ../control && $ISAAC_PY mpc_tracking.py --headless --csv_log_path "$1" --save_path "$2" \
+       --traj_start "$3" --num_trajs "$nt" --mpc_r "$4")
+    return
+  fi
+  $PY - "$1" "$NGPU" <<'EOF'
+import sys, pandas as pd
+d = pd.read_csv(sys.argv[1]); k = int(sys.argv[2])
+for g in range(k):
+    d.iloc[g::k].to_csv(f"{sys.argv[1]}.chunk{g}", index=False)
+EOF
+  for g in $(seq 0 $((NGPU - 1))); do
+    (cd ../control && CUDA_VISIBLE_DEVICES=$g $ISAAC_PY mpc_tracking.py --headless --csv_log_path "$1.chunk$g" \
+       --save_path "$2.chunk$g" --traj_start "$3" --num_trajs "$nt" --mpc_r "$4" > "$2.chunk$g.log" 2>&1) &
+  done
+  wait
+  $PY - "$2" "$NGPU" <<'EOF'
+import sys, os, pandas as pd
+parts = [f"{sys.argv[1]}.chunk{g}" for g in range(int(sys.argv[2]))]
+pd.concat([pd.read_csv(p) for p in parts if os.path.exists(p)], ignore_index=True).to_csv(sys.argv[1], index=False)
+EOF
 }
 
 collect() {  # out_csv project...
