@@ -16,6 +16,7 @@ _script_dir = os.path.dirname(os.path.abspath(__file__))
 _project_root = os.path.dirname(_script_dir)
 sys.path.insert(0, os.path.join(_project_root, 'utility'))
 from network import KoopmanNet
+from mpc_core import MPCSolver, step_errors, METRICS
 
 # -------------------- Argparse / Isaac App --------------------
 parser = argparse.ArgumentParser(description="Batch-track G1 and Go2 with dkuc Koopman MPC")
@@ -307,41 +308,26 @@ def run_one_tracking(model_path, row):
     start = time.time()
 
     print(f"[INFO] Tracking {name} | normalized={norm_stats is not None} | steps={max_steps} | num_envs={num_envs}")
+    solver = MPCSolver(net, TRAJ_LEN, m_dim, latent_dim, s_dim, R_scale=args_cli.mpc_r, device=device)
+    step_err = {k: [] for k in METRICS}                       # per step: (N,) tensors
+    surv_t = torch.zeros(num_envs, dtype=torch.double, device=device)
+    done_t = torch.zeros(num_envs, dtype=torch.bool, device=device)
     with torch.inference_mode():
         for i in tqdm(range(max_steps)):
-            # ---------- Raw signals for metrics ----------
+            # ---------- Raw signals for metrics (all environments at once; same values as the per-env loop) ----------
             dof_pos = base.scene['robot'].data.joint_pos.clone()
             dof_vel = base.scene['robot'].data.joint_vel.clone()
             root_st = base.scene['robot'].data.root_state_w.clone()
             state_full = torch.cat([dof_pos, dof_vel, root_st], dim=1)
-
-            for j in range(num_envs):
-                if i != 0 and hasattr(env, 'dones') and env.dones[j]:
-                    last_vel[j] = dof_vel[j].clone()
-
-                if name == "G1":
-                    JrPE_list[j].append(torch.abs(state_data_raw[i, j, :23]    - state_full[j, :23]).mean())
-                    JrVE_list[j].append(torch.abs(state_data_raw[i, j, 37:60] - state_full[j, 37:60]).mean())
-                    JrAE_list[j].append(torch.abs(ref_acc_raw[i, j, :] - compute_dof_acc(dof_vel, last_vel, env_cfg)[j, :23]).mean())
-                    RPE_list[j].append( torch.abs(state_data_raw[i, j, 74:77] - state_full[j, 74:77]).mean())
-                    ROE_list[j].append( torch.abs(state_data_raw[i, j, 77:81] - state_full[j, 77:81]).mean())
-                    RLVE_list[j].append(torch.abs(state_data_raw[i, j, 81:84] - state_full[j, 81:84]).mean())
-                    RAVE_list[j].append(torch.abs(state_data_raw[i, j, 84:87] - state_full[j, 84:87]).mean())
-                else:  # Go2
-                    JrPE_list[j].append(torch.abs(state_data_raw[i, j, :12]   - state_full[j, :12]).mean())
-                    JrVE_list[j].append(torch.abs(state_data_raw[i, j, 12:24]- state_full[j, 12:24]).mean())
-                    JrAE_list[j].append(torch.abs(ref_acc_raw[i, j, :] - compute_dof_acc(dof_vel, last_vel, env_cfg)[j, :]).mean())
-                    RPE_list[j].append( torch.abs(state_data_raw[i, j, 24:27] - state_full[j, 24:27]).mean())
-                    ROE_list[j].append( torch.abs(state_data_raw[i, j, 27:31] - state_full[j, 27:31]).mean())
-                    RLVE_list[j].append(torch.abs(state_data_raw[i, j, 31:34] - state_full[j, 31:34]).mean())
-                    RAVE_list[j].append(torch.abs(state_data_raw[i, j, 34:37] - state_full[j, 34:37]).mean())
-
-            cur_JrPE = torch.tensor([env_list[-1] for env_list in JrPE_list], device='cpu')
-            for j in range(num_envs):
-                if cur_JrPE[j].item() > threshold:
-                    collect_done[j] = True
-                if not collect_done[j]:
-                    survival_steps[j] += 1.0
+            if i != 0 and hasattr(env, 'dones'):
+                d = env.dones[:num_envs].bool()
+                last_vel[d] = dof_vel[d]
+            e = step_errors(name, state_data_raw[i, :num_envs], ref_acc_raw[i, :num_envs],
+                            state_full[:num_envs], compute_dof_acc(dof_vel, last_vel, env_cfg)[:num_envs])
+            for k in METRICS:
+                step_err[k].append(e[k])
+            done_t |= e["JrPE"] > threshold
+            surv_t += (~done_t).double()
 
             # ---------- Trim + Normalize for CONTROL ----------
             # ref window indices
@@ -358,7 +344,7 @@ def run_one_tracking(model_path, row):
             obs_norm = normalize_state(obs_t, norm_stats) if norm_stats is not None else obs_t
 
             # ---------- MPC in normalized space ----------
-            a_norm = Torch_MPC(net, obs_norm, X_ref_norm, TRAJ_LEN, m_dim, latent_dim, s_dim)  # (N, m_dim)
+            a_norm = solver(obs_norm, X_ref_norm)  # (N, m_dim); identical to Torch_MPC, matrices cached
 
             # Denormalize to env units, then match env action dim
             a_env_trim = denormalize_action(a_norm, norm_stats) if norm_stats is not None else a_norm  # (N, U_trim)
@@ -382,17 +368,11 @@ def run_one_tracking(model_path, row):
 
     end = time.time()
 
-    # Averages
-    def _mean_or_zero(lst):
-        return torch.tensor(lst).mean().item() if len(lst) else 0.0
-    for i in range(num_envs):
-        JrPE_list[i] = _mean_or_zero(JrPE_list[i])
-        JrVE_list[i] = _mean_or_zero(JrVE_list[i])
-        JrAE_list[i] = _mean_or_zero(JrAE_list[i])
-        RPE_list[i]  = _mean_or_zero(RPE_list[i])
-        ROE_list[i]  = _mean_or_zero(ROE_list[i])
-        RLVE_list[i] = _mean_or_zero(RLVE_list[i])
-        RAVE_list[i] = _mean_or_zero(RAVE_list[i])
+    # Averages over time steps, per environment
+    per_env = {k: torch.stack(step_err[k]).mean(dim=0).cpu().numpy() for k in METRICS}
+    JrPE_list, JrVE_list, JrAE_list = per_env["JrPE"], per_env["JrVE"], per_env["JrAE"]
+    RPE_list, ROE_list, RLVE_list, RAVE_list = per_env["RPE"], per_env["ROE"], per_env["RLVE"], per_env["RAVE"]
+    survival_steps = surv_t.cpu().numpy()
 
     env.close()
     import gc; gc.collect()
