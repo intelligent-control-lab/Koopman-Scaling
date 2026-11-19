@@ -16,6 +16,18 @@ done
 echo "[bolt] python: $PY"; "$PY" -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
 "$PY" -c "import isaaclab, isaaclab_tasks; print('isaaclab ok')" || echo "[bolt] WARNING: isaaclab import failed"
 export PY ISAAC_PY="$PY" ENV
+# Datasets shipped as portable .npz (name.cache.npz) are converted to the training cache (name.pt) here,
+# with the container's numpy, because a .pt pickled by a newer numpy cannot be loaded in this image.
+for z in ../data/datasets/*.cache.npz; do
+  [ -f "$z" ] || continue; pt="${z%.cache.npz}.pt"; [ -f "$pt" ] && continue
+  "$PY" - "$z" "$pt" <<'EOF'
+import sys, numpy as np, torch
+z = np.load(sys.argv[1])
+torch.save({"Ktrain_data": z["Ktrain_data"], "Kval_data": z["Kval_data"], "Ktest_data": z["Ktest_data"],
+            "norm_stats": {k[3:]: z[k] for k in z.files if k.startswith("ns_")}}, sys.argv[2])
+print("[bolt] built dataset cache", sys.argv[2])
+EOF
+done
 # Limit CPU threads per process so that parallel trainings do not compete for all cores.
 NCPU=$(nproc 2>/dev/null || echo 24); P=${PARALLEL:-1}
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-$(( NCPU / P > 1 ? NCPU / P : 1 ))}

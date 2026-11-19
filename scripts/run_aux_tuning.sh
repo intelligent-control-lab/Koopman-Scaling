@@ -40,6 +40,8 @@ train() {  # project m n_mult seed steps use_cov use_ctrl w_cov w_ctrl [gpu]
 # Run up to PARALLEL trainings at once; each run has its own project directory (no shared log file).
 # NGPU > 1 spreads trainings and MPC chunks over the GPUs of one node.
 PARALLEL=${PARALLEL:-1}; NGPU=${NGPU:-1}
+# Training-set sizes: M_SELECT for stage 1, M_GRID for stage 2 (override when a dataset has fewer windows).
+M_SELECT=${M_SELECT:-140000}; M_GRID=${M_GRID:-"1000 4000 16000 64000 140000"}
 # SHARD/NSHARDS split the runs of a stage across Bolt tasks (run index modulo NSHARDS).
 SHARD=${SHARD:-0}; NSHARDS=${NSHARDS:-1}; RUN_IDX=0; MY_IDX=0
 MY_PROJECTS=()
@@ -139,10 +141,10 @@ if [ "$STAGE" = select ]; then
     steps=$(echo "$p" | sed -E 's/.*_s([0-9]+).*/\1/')
     for nm in 1 4 16; do for seed in 17382 76849; do
       if [[ $p == *_base_* ]]; then
-        queue "$p" 140000 "$nm" "$seed" "$steps" 0 0 1 1
+        queue "$p" "$M_SELECT" "$nm" "$seed" "$steps" 0 0 1 1
       else
         wcov=$(echo "$p" | sed -E 's/.*_c([0-9.]+)_u.*/\1/'); wctrl=$(echo "$p" | sed -E 's/.*_u([0-9.]+)$/\1/')
-        queue "$p" 140000 "$nm" "$seed" "$steps" 1 1 "$wcov" "$wctrl"
+        queue "$p" "$M_SELECT" "$nm" "$seed" "$steps" 1 1 "$wcov" "$wctrl"
       fi
     done; done
   done
@@ -160,7 +162,7 @@ print(s['baseline']['train_steps'], s['both']['train_steps'], s['both']['cov_los
   projects=()
   for arm in base cov ctrl both; do
     p=aux_final_${ENV}_${arm}; projects+=("$p")
-    for m in 1000 4000 16000 64000 140000; do for nm in 1 2 4 8 16; do
+    for m in $M_GRID; do for nm in 1 2 4 8 16; do
       for seed in 17382 76849 20965 84902 51194; do
         case $arm in
           base) queue "$p" "$m" "$nm" "$seed" "$BSTEPS" 0 0 1 1 ;;
