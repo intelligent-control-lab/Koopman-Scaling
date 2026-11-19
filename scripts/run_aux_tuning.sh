@@ -65,11 +65,39 @@ sys.exit(0 if ((d.train_samples == int(sys.argv[2])) & (d.encode_dim_param == in
 EOF
 }
 
+rows() { [ -f "$1" ] && $PY -c "import pandas as pd,sys; print(len(pd.read_csv(sys.argv[1])))" "$1" 2>/dev/null || echo 0; }
+mpc_chunk() {  # models_csv out_csv traj_start num_trajs r gpu: one model per Isaac process, each with a time limit
+  local total done before fails=0
+  total=$(rows "$1")
+  while :; do
+    before=$(rows "$2")
+    [ "$before" -ge "$total" ] && break
+    (cd ../control && CUDA_VISIBLE_DEVICES=$6 timeout ${MPC_TIMEOUT:-1200} $ISAAC_PY mpc_tracking.py --headless \
+       --csv_log_path "$1" --save_path "$2" --traj_start "$3" --num_trajs "$4" --mpc_r "$5" --max_models 1) || true
+    done=$(rows "$2")
+    if [ "$done" -le "$before" ]; then
+      fails=$((fails + 1)); echo "[mpc] no progress on attempt $fails"
+      if [ $fails -ge 2 ]; then   # record the next model as failed and move on
+        $PY - "$1" "$2" "$3" "$4" "$5" <<'EOF'
+import sys, os, pandas as pd
+m = pd.read_csv(sys.argv[1]); out = sys.argv[2]
+done = set(pd.read_csv(out).model_path) if os.path.exists(out) else set()
+todo = [p for p in m.model_path if p not in done]
+if todo:
+    row = pd.DataFrame([dict(model_path=todo[0], robot=m.env_name.iloc[0], traj_start=int(sys.argv[3]),
+                             num_trajs=int(sys.argv[4]), mpc_r=float(sys.argv[5]), failed=1)])
+    (pd.concat([pd.read_csv(out), row], ignore_index=True) if os.path.exists(out) else row).to_csv(out, index=False)
+    print("[mpc] recorded as failed:", todo[0])
+EOF
+        fails=0
+      fi
+    else fails=0; fi
+  done
+}
 run_mpc() {  # models_csv out_csv traj_start r  (with NGPU > 1: one chunk of models per GPU, in parallel)
   local nt; nt=$([ "$3" = 0 ] && echo 1000 || echo 500)
   if [ "$NGPU" -le 1 ]; then
-    (cd ../control && $ISAAC_PY mpc_tracking.py --headless --csv_log_path "$1" --save_path "$2" \
-       --traj_start "$3" --num_trajs "$nt" --mpc_r "$4")
+    mpc_chunk "$1" "$2" "$3" "$nt" "$4" 0
     return
   fi
   $PY - "$1" "$NGPU" <<'EOF'
@@ -79,8 +107,7 @@ for g in range(k):
     d.iloc[g::k].to_csv(f"{sys.argv[1]}.chunk{g}", index=False)
 EOF
   for g in $(seq 0 $((NGPU - 1))); do
-    (cd ../control && CUDA_VISIBLE_DEVICES=$g $ISAAC_PY mpc_tracking.py --headless --csv_log_path "$1.chunk$g" \
-       --save_path "$2.chunk$g" --traj_start "$3" --num_trajs "$nt" --mpc_r "$4" > "$2.chunk$g.log" 2>&1) &
+    mpc_chunk "$1.chunk$g" "$2.chunk$g" "$3" "$nt" "$4" "$g" > "$2.chunk$g.log" 2>&1 &
   done
   wait
   $PY - "$2" "$NGPU" <<'EOF'

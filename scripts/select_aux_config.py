@@ -29,6 +29,10 @@ def main():
     tables = []
     val = pd.concat([pd.read_csv(f) for f in sorted(glob.glob(os.path.join(root, "select_val_r*.csv")))],
                     ignore_index=True)
+    if "failed" in val:
+        bad = val[val.failed.fillna(0) == 1]
+        print(f"[select] {len(bad)} evaluations failed (hang or error) and are excluded:", *bad.model_path, sep="\n  ")
+        val = val[val.failed.fillna(0) != 1]
     for _, part in val.groupby("mpc_r"):
         res = part.merge(models[["model_path"] + keys + ["encode_dim_param", "seed"]], on="model_path")
         res.loc[res.arm == "baseline", ["cov_loss_weight", "ctrl_loss_weight"]] = float("nan")

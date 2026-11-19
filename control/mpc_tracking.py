@@ -30,6 +30,8 @@ parser.add_argument('--start_idx', type=int, default=0, help='Start index (resum
 parser.add_argument('--traj_start', type=int, default=0,
     help='First reference trajectory to track (the paper uses 0-999; use e.g. 1000 for a validation set)')
 parser.add_argument('--num_trajs', type=int, default=1000, help='Number of reference trajectories to track')
+parser.add_argument('--max_models', type=int, default=0,
+    help='Stop after this many new models (0 = all). Use 1 to evaluate one model per process.')
 parser.add_argument('--mpc_r', type=float, default=0.0,
     help='Input weight R = mpc_r * I in the MPC cost (the paper uses 0)')
 args_cli = parser.parse_args()
@@ -441,6 +443,11 @@ if __name__ == '__main__':
                 print(f"[INFO] Saved results incrementally to {args_cli.save_path}")
                 print(f"[INFO] Metrics: JrPE={res['mean_JrPE']:.4f}, JrVE={res['mean_JrVE']:.4f}, "
                       f"JrAE={res['mean_JrAE']:.4f}, survival_steps={res['mean_survival_steps']:.1f}")
+                if args_cli.max_models and len(results) >= args_cli.max_models:
+                    # Creating a second Isaac Lab environment in the same process can hang, so the caller
+                    # runs one model per process; exit right away (results are already saved).
+                    print("[DONE] max_models reached", flush=True)
+                    sys.stdout.flush(); os._exit(0)
 
             except Exception as e:
                 print(f"[ERROR] Exception while processing {row['model_path']}: {e}")
