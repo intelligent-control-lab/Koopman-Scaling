@@ -2,7 +2,7 @@
 
 Usage:  python analyse_aux_final.py <dir with final_models_*.csv and final_test_*.csv> [out_dir]
 Prints the per-sweep curves, the relative changes in the format of the paper's Table 4, the m=140k values
-with seed spread, and writes g1_control_tuned.pdf in the style of the paper's Fig. 6.
+with seed spread, and writes <env>_control_tuned.pdf in the style of the paper's Fig. 6.
 """
 import glob
 import os
@@ -20,11 +20,10 @@ tests = pd.concat([pd.read_csv(f) for f in sorted(glob.glob(os.path.join(src, "f
 if "failed" in tests:
     print("failed evaluations:", int(tests.failed.fillna(0).sum()))
     tests = tests[tests.failed.fillna(0) != 1]
-arm_of = {"aux_final_G1_base": "Baseline", "aux_final_G1_cov": "+Cov", "aux_final_G1_ctrl": "+Ctrl",
-          "aux_final_G1_both": "+Both"}
+SUFFIX = {"base": "Baseline", "cov": "+Cov", "ctrl": "+Ctrl", "both": "+Both"}   # aux_final_<ENV>_<arm>
 d = tests.merge(models[["model_path", "project", "train_samples", "encode_dim_param", "encode_dim", "seed"]],
                 on="model_path")
-d["arm"] = d.project.map(arm_of)
+d["arm"] = d.project.str.rsplit("_", n=1).str[-1].map(SUFFIX)
 print(f"{len(d)} evaluated models;", d.groupby("arm").size().to_dict())
 ARMS = ["Baseline", "+Cov", "+Ctrl", "+Both"]
 
@@ -64,7 +63,8 @@ try:
         ax[k].grid(True, ls="--", alpha=0.4)
         ax[k].legend(ncol=2, fontsize=9)
     fig.tight_layout()
-    fig.savefig(os.path.join(out, "g1_control_tuned.pdf"), bbox_inches="tight")
-    print("\nwrote", os.path.join(out, "g1_control_tuned.pdf"))
+    env = d.project.iloc[0].split("_")[2].lower()
+    fig.savefig(os.path.join(out, f"{env}_control_tuned.pdf"), bbox_inches="tight")
+    print("\nwrote", os.path.join(out, f"{env}_control_tuned.pdf"))
 except ImportError:
     pass
