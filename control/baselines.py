@@ -113,3 +113,87 @@ class RandomShootingMPC:
             best = cost.argmin(dim=1)                              # (n,)
             out[a:b] = U[torch.arange(n, device=U.device), best, 0].double()
         return out
+
+
+class Planner:
+    """Model-agnostic MPC planners for the planner-matched comparison.
+
+    Every planner minimizes the objective of the closed-form linear MPC (mpc_core.MPCSolver):
+        J(U) = sum_{k=0..H} ||x_k - x_ref,k||^2 + r * sum_k ||u_k||^2,
+    in normalized coordinates, with inputs restricted to the normalized clamp box [lo, hi].
+    The model is given by init(x_norm) -> s0 (internal state), step(s, u) -> s', and phys(s) -> x.
+    mode: 'rs'   random shooting, K uniform samples (no warm start);
+          'cem'  cross-entropy method, `iters` rounds of K samples, warm-started from the shifted previous plan;
+          'grad' gradient descent (Adam) on one input sequence per environment, warm-started, projected onto the box.
+    """
+
+    def __init__(self, init, step, phys, H, lo, hi, r=1e-3, mode="rs", K=1000, iters=5, elite=50,
+                 grad_iters=50, lr=0.1, env_chunk=50, seed=0):
+        self.init, self.step, self.phys = init, step, phys
+        self.H, self.lo, self.hi, self.r, self.mode = H, lo.float(), hi.float(), r, mode
+        self.K, self.iters, self.elite, self.grad_iters, self.lr, self.chunk = K, iters, elite, grad_iters, lr, env_chunk
+        self.gen = torch.Generator(device=lo.device).manual_seed(seed)
+        self.prev = None
+
+    def _cost(self, s0, U, ref):
+        """s0: (n, D); U: (n, K, H, m); ref: (H+1, n, S). Returns (n, K)."""
+        n, K = U.shape[:2]
+        s = s0.unsqueeze(1).expand(n, K, s0.shape[-1]).reshape(n * K, -1)
+        c = ((self.phys(s).view(n, K, -1) - ref[0].unsqueeze(1)) ** 2).sum(-1)
+        for k in range(self.H):
+            s = self.step(s, U[:, :, k].reshape(n * K, -1))
+            c = c + ((self.phys(s).view(n, K, -1) - ref[k + 1].unsqueeze(1)) ** 2).sum(-1)
+        return c + self.r * (U ** 2).sum((-1, -2))
+
+    def __call__(self, x_norm, X_ref_norm):
+        N = x_norm.shape[0]
+        m = self.lo.shape[0]
+        dev = x_norm.device
+        if self.prev is None:
+            self.prev = torch.zeros(N, self.H, m, device=dev).clamp(self.lo, self.hi)
+        warm = torch.cat([self.prev[:, 1:], self.prev[:, -1:]], dim=1)
+        out_plan = torch.empty_like(warm)
+        for a in range(0, N, self.chunk):
+            b = min(N, a + self.chunk)
+            x = x_norm[a:b].float()
+            ref = X_ref_norm[:, a:b].float()
+            if self.mode == "grad":
+                with torch.inference_mode(False), torch.enable_grad():
+                    s0 = self.init(x.clone()).detach()
+                    ref_g = ref.clone()
+                    U = warm[a:b].clone().unsqueeze(1).requires_grad_(True)       # (n, 1, H, m)
+                    opt = torch.optim.Adam([U], lr=self.lr)
+                    for _ in range(self.grad_iters):
+                        opt.zero_grad()
+                        self._cost(s0, U, ref_g).sum().backward()
+                        opt.step()
+                        with torch.no_grad():
+                            U.data = torch.max(torch.min(U.data, self.hi), self.lo)
+                    U_best = U.detach()[:, 0].clone()
+                out_plan[a:b] = U_best
+                continue
+            with torch.no_grad():
+                s0 = self.init(x)
+                n = b - a
+                if self.mode == "rs":
+                    U = self.lo + (self.hi - self.lo) * torch.rand(n, self.K, self.H, m, device=dev, generator=self.gen)
+                    out_plan[a:b] = U[torch.arange(n, device=dev), self._cost(s0, U, ref).argmin(1)]
+                    continue
+                mu, sd = warm[a:b].clone(), (0.5 * (self.hi - self.lo)).expand(n, self.H, m).clone()
+                best_c = torch.full((n,), float("inf"), device=dev)
+                best_U = mu.clone()
+                for _ in range(self.iters):
+                    U = mu.unsqueeze(1) + sd.unsqueeze(1) * torch.randn(n, self.K, self.H, m, device=dev, generator=self.gen)
+                    U = torch.max(torch.min(U, self.hi), self.lo)
+                    U[:, 0] = mu                                                    # keep the current mean as a candidate
+                    c = self._cost(s0, U, ref)
+                    idx = c.topk(self.elite, dim=1, largest=False).indices          # (n, E)
+                    el = U[torch.arange(n, device=dev).unsqueeze(1), idx]          # (n, E, H, m)
+                    mu, sd = el.mean(1), el.std(1) + 1e-3
+                    cmin, imin = c.min(1)
+                    better = cmin < best_c
+                    best_c = torch.where(better, cmin, best_c)
+                    best_U[better] = U[torch.arange(n, device=dev), imin][better]
+                out_plan[a:b] = best_U
+        self.prev = out_plan
+        return out_plan[:, 0].double()

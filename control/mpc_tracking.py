@@ -17,7 +17,7 @@ _project_root = os.path.dirname(_script_dir)
 sys.path.insert(0, os.path.join(_project_root, 'utility'))
 from network import KoopmanNet
 from mpc_core import MPCSolver, step_errors, METRICS
-from baselines import load_edmd, load_mlp, RandomShootingMPC
+from baselines import load_edmd, load_mlp, RandomShootingMPC, Planner
 
 # -------------------- Argparse / Isaac App --------------------
 parser = argparse.ArgumentParser(description="Batch-track G1 and Go2 with dkuc Koopman MPC")
@@ -42,6 +42,12 @@ parser.add_argument('--dataset_path', type=str, default='',
     help='Dataset file whose norm_stats the EDMD/NNDM baselines were trained with (.pt or .cache.npz)')
 parser.add_argument('--rs_samples', type=int, default=1000, help='Random-shooting samples per step (nndm)')
 parser.add_argument('--rs_seed', type=int, default=0, help='Random-shooting sampler seed (nndm)')
+parser.add_argument('--planner', type=str, default='default', choices=['default', 'rs', 'cem', 'grad'],
+    help='default: closed-form linear MPC (koopman/edmd) or the original random shooting (nndm); '
+         'rs/cem/grad: the same planner for any model, minimizing the linear-MPC objective (baselines.Planner)')
+parser.add_argument('--cem_iters', type=int, default=5, help='CEM rounds of rs_samples samples')
+parser.add_argument('--grad_iters', type=int, default=50, help='Adam steps of the gradient planner')
+parser.add_argument('--grad_lr', type=float, default=0.1, help='Adam step size of the gradient planner')
 args_cli = parser.parse_args()
 
 app_launcher = AppLauncher(args_cli)
@@ -335,16 +341,31 @@ def run_one_tracking(model_path, row):
     start = time.time()
 
     print(f"[INFO] Tracking {name} | normalized={norm_stats is not None} | steps={max_steps} | num_envs={num_envs}")
-    if args_cli.controller == 'nndm':
-        # Sample inputs uniformly in the normalized image of the clamp box used below (reference action range).
-        a_lo = action_data_raw[:, :num_envs, :m_dim].min(dim=0).values.min(dim=0).values
-        a_hi = action_data_raw[:, :num_envs, :m_dim].max(dim=0).values.max(dim=0).values
-        if norm_stats is not None:
-            a_lo = (a_lo - norm_stats['action_mean']) / norm_stats['action_std']
-            a_hi = (a_hi - norm_stats['action_mean']) / norm_stats['action_std']
+    # Normalized image of the clamp box used below (reference action range), for the sampling planners.
+    a_lo = action_data_raw[:, :num_envs, :m_dim].min(dim=0).values.min(dim=0).values
+    a_hi = action_data_raw[:, :num_envs, :m_dim].max(dim=0).values.max(dim=0).values
+    if norm_stats is not None:
+        a_lo = (a_lo - norm_stats['action_mean']) / norm_stats['action_std']
+        a_hi = (a_hi - norm_stats['action_mean']) / norm_stats['action_std']
+    if args_cli.planner != 'default':
+        if args_cli.controller == 'nndm':
+            p_init, p_step, p_phys = (lambda x: x), (lambda s, u: net(s, u)), (lambda s: s)
+        else:
+            A_f, B_f = net.lA.weight.data.float(), net.lB.weight.data.float()
+            p_init = lambda x: net.encode(x.double()).float()
+            p_step = lambda z, u: z @ A_f.T + u @ B_f.T
+            p_phys = lambda z: z[:, :s_dim]
+        solver = Planner(p_init, p_step, p_phys, TRAJ_LEN, a_lo, a_hi, r=args_cli.mpc_r, mode=args_cli.planner,
+                         K=args_cli.rs_samples, iters=args_cli.cem_iters, grad_iters=args_cli.grad_iters,
+                         lr=args_cli.grad_lr, env_chunk=(num_envs if args_cli.planner == 'grad' else 50),
+                         seed=args_cli.rs_seed)
+    elif args_cli.controller == 'nndm':
         solver = RandomShootingMPC(net, TRAJ_LEN, a_lo, a_hi, num_samples=args_cli.rs_samples, seed=args_cli.rs_seed)
     else:
         solver = MPCSolver(net, TRAJ_LEN, m_dim, latent_dim, s_dim, R_scale=args_cli.mpc_r, device=device)
+    clip_n = torch.zeros((), dtype=torch.double, device=device)      # clipped input entries (alive envs)
+    clip_any = torch.zeros((), dtype=torch.double, device=device)    # env-steps with any clipped entry
+    alive_n = torch.zeros((), dtype=torch.double, device=device)     # alive env-steps
     step_err = {k: [] for k in METRICS}                       # per step: (N,) tensors
     surv_t = torch.zeros(num_envs, dtype=torch.double, device=device)
     done_t = torch.zeros(num_envs, dtype=torch.bool, device=device)
@@ -395,6 +416,11 @@ def run_one_tracking(model_path, row):
             # Clamp to ref action range (raw units)
             action_l = action_data_raw[:, :num_envs, :].min(dim=0).values.min(dim=0).values
             action_u = action_data_raw[:, :num_envs, :].max(dim=0).values.max(dim=0).values
+            alive = ~done_t
+            clipped = ((a_env < action_l.double() - 1e-9) | (a_env > action_u.double() + 1e-9))[:, :m_dim]
+            clip_n += clipped[alive].double().sum()
+            clip_any += clipped.any(dim=1)[alive].double().sum()
+            alive_n += alive.double().sum()
             a_env = a_env.clamp(action_l.double(), action_u.double()).float()
 
             # Step
@@ -421,6 +447,9 @@ def run_one_tracking(model_path, row):
         'num_trajs': num_envs,
         'mpc_r': args_cli.mpc_r,
         'controller': args_cli.controller,
+        'planner': args_cli.planner,
+        'clip_frac': float(clip_n / (alive_n * m_dim).clamp(min=1)),
+        'clip_any_frac': float(clip_any / alive_n.clamp(min=1)),
         'mean_JrPE': np.mean(JrPE_list),
         'mean_JrVE': np.mean(JrVE_list),
         'mean_JrAE': np.mean(JrAE_list),

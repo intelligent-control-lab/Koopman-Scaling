@@ -26,7 +26,8 @@ import torch
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "utility"))
 import export_page_demo as E  # noqa: E402
-from split_study import SEEDS, MULTS, permutation  # noqa: E402
+from split_study import SEEDS, permutation  # noqa: E402
+MULTS = tuple(int(k) for k in os.environ.get("MULTS", "1 2 4 8 16 32").split())
 
 M_GRID = (5, 10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 8000)
 R = 40
@@ -35,7 +36,7 @@ OUT = os.path.join(HERE, "..", "log", "fixed_feature_study.csv")
 
 def encoder(seed, mult):
     project = f"page_grid_m4000_k{mult}" if seed == SEEDS[0] else f"split_s{seed}_m4000_k{mult}"
-    path = max(glob.glob(os.path.join(HERE, "..", "log", project, "best_models", "*.pth")), key=os.path.getmtime)
+    path = max(glob.glob(os.path.join(HERE, "..", "log", project, "best_models", "*.pth")), key=os.path.basename)
     net, _, n = E.load_net(path)
 
     def enc(X):
