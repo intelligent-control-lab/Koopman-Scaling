@@ -17,6 +17,7 @@ _project_root = os.path.dirname(_script_dir)
 sys.path.insert(0, os.path.join(_project_root, 'utility'))
 from network import KoopmanNet
 from mpc_core import MPCSolver, step_errors, METRICS
+from baselines import load_edmd, load_mlp, RandomShootingMPC
 
 # -------------------- Argparse / Isaac App --------------------
 parser = argparse.ArgumentParser(description="Batch-track G1 and Go2 with dkuc Koopman MPC")
@@ -34,6 +35,13 @@ parser.add_argument('--max_models', type=int, default=0,
     help='Stop after this many new models (0 = all). Use 1 to evaluate one model per process.')
 parser.add_argument('--mpc_r', type=float, default=0.0,
     help='Input weight R = mpc_r * I in the MPC cost (the paper uses 0)')
+parser.add_argument('--controller', type=str, default='koopman', choices=['koopman', 'edmd', 'nndm'],
+    help='koopman: KoopmanNet + linear MPC; edmd: polynomial EDMD + the same linear MPC; '
+         'nndm: MLP dynamics + random-shooting MPC')
+parser.add_argument('--dataset_path', type=str, default='',
+    help='Dataset file whose norm_stats the EDMD/NNDM baselines were trained with (.pt or .cache.npz)')
+parser.add_argument('--rs_samples', type=int, default=1000, help='Random-shooting samples per step (nndm)')
+parser.add_argument('--rs_seed', type=int, default=0, help='Random-shooting sampler seed (nndm)')
 args_cli = parser.parse_args()
 
 app_launcher = AppLauncher(args_cli)
@@ -233,6 +241,15 @@ def load_koopman_model_and_stats(path, env_name, device):
 
     return net, norm_stats
 
+def load_dataset_norm_stats(path, device):
+    """norm_stats of a dataset file (.pt with a 'norm_stats' dict, or .cache.npz with ns_* arrays)."""
+    if path.endswith('.npz'):
+        z = np.load(path)
+        ns = {k[3:]: z[k] for k in z.files if k.startswith('ns_')}
+    else:
+        ns = torch.load(path, weights_only=False, map_location='cpu')['norm_stats']
+    return to_torch_stats(ns, device, dtype=torch.double)
+
 # -------------------- Observation helpers --------------------
 def get_raw_obs_vec(env):
     base = getattr(env, 'unwrapped', getattr(env, 'env', env))
@@ -266,15 +283,23 @@ def run_one_tracking(model_path, row):
     env_action_dim = action_data_raw.shape[-1]
 
     # Load model + norm stats
-    net, norm_stats = load_koopman_model_and_stats(model_path, name, device)
+    if args_cli.controller == 'koopman':
+        net, norm_stats = load_koopman_model_and_stats(model_path, name, device)
+    elif args_cli.controller == 'edmd':
+        net, norm_stats = load_edmd(model_path, S_trim, device), load_dataset_norm_stats(args_cli.dataset_path, device)
+    else:
+        net, norm_stats = load_mlp(model_path, device), load_dataset_norm_stats(args_cli.dataset_path, device)
     net.eval()
 
     # Derived sizes
-    with torch.no_grad():
-        dummy = torch.zeros(1, S_trim, dtype=torch.double, device=device)
-        latent_dim = net.encode(dummy).shape[-1]
     s_dim = S_trim
-    m_dim = net.lB.weight.shape[1]  # trimmed action dim used by the model
+    if args_cli.controller == 'nndm':
+        latent_dim, m_dim = S_trim, net.u_dim
+    else:
+        with torch.no_grad():
+            dummy = torch.zeros(1, S_trim, dtype=torch.double, device=device)
+            latent_dim = net.encode(dummy).shape[-1]
+        m_dim = net.lB.weight.shape[1]  # trimmed action dim used by the model
 
     # Build env
     num_envs = state_data_raw.shape[1]
@@ -310,7 +335,16 @@ def run_one_tracking(model_path, row):
     start = time.time()
 
     print(f"[INFO] Tracking {name} | normalized={norm_stats is not None} | steps={max_steps} | num_envs={num_envs}")
-    solver = MPCSolver(net, TRAJ_LEN, m_dim, latent_dim, s_dim, R_scale=args_cli.mpc_r, device=device)
+    if args_cli.controller == 'nndm':
+        # Sample inputs uniformly in the normalized image of the clamp box used below (reference action range).
+        a_lo = action_data_raw[:, :num_envs, :m_dim].min(dim=0).values.min(dim=0).values
+        a_hi = action_data_raw[:, :num_envs, :m_dim].max(dim=0).values.max(dim=0).values
+        if norm_stats is not None:
+            a_lo = (a_lo - norm_stats['action_mean']) / norm_stats['action_std']
+            a_hi = (a_hi - norm_stats['action_mean']) / norm_stats['action_std']
+        solver = RandomShootingMPC(net, TRAJ_LEN, a_lo, a_hi, num_samples=args_cli.rs_samples, seed=args_cli.rs_seed)
+    else:
+        solver = MPCSolver(net, TRAJ_LEN, m_dim, latent_dim, s_dim, R_scale=args_cli.mpc_r, device=device)
     step_err = {k: [] for k in METRICS}                       # per step: (N,) tensors
     surv_t = torch.zeros(num_envs, dtype=torch.double, device=device)
     done_t = torch.zeros(num_envs, dtype=torch.bool, device=device)
@@ -386,6 +420,7 @@ def run_one_tracking(model_path, row):
         'traj_start': args_cli.traj_start,
         'num_trajs': num_envs,
         'mpc_r': args_cli.mpc_r,
+        'controller': args_cli.controller,
         'mean_JrPE': np.mean(JrPE_list),
         'mean_JrVE': np.mean(JrVE_list),
         'mean_JrAE': np.mean(JrAE_list),
