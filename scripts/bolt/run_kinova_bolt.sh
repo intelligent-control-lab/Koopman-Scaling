@@ -22,5 +22,7 @@ if [ -n "$CK" ]; then
       && "$PY" -c "import apple_bolt; apple_bolt.checkpoint()" >/dev/null 2>&1; done ) > /dev/null 2>&1 &
   CKPT_PID=$!
 fi
-trap '[ -n "${CKPT_PID:-}" ] && kill $CKPT_PID 2>/dev/null; mkdir -p "$ART/logs"; for d in ../log/Kinova_v3__*; do [ -d "$d" ] && cp "$d/koopman_results_log.csv" "$ART/logs/$(basename $d).csv" 2>/dev/null; done' EXIT
+trap '[ -n "${CKPT_PID:-}" ] && kill $CKPT_PID 2>/dev/null; mkdir -p "$ART/logs"; for d in ../log/Kinova_v3*__*; do [ -d "$d" ] && cp "$d/koopman_results_log.csv" "$ART/logs/$(basename $d).csv" 2>/dev/null; done' EXIT
+echo "[kinova] LOSS=${LOSS:-base} SHARD=${SHARD:-0}/${NSHARDS:-1}"
 "$PY" kinova_sweep.py
+exit 0

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Kinova-only rerun after the window/split fix in utility/dataset.py (non-overlapping
-# consecutive windows, chronological train|val|test split). Results go to ../log/Kinova_v3. Only the +Both configuration used by the paper scaling figures (125 runs).
+# consecutive windows, chronological train|val|test split). Results go to ../log/Kinova_v3. +Both configuration only (125 runs); the paper's scaling figures use the baseline configuration (see kinova_sweep.py, LOSS=base).
 
 # =================================================================
 # == Hyperparameter Experiment Runner Script ==
