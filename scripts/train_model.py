@@ -329,6 +329,8 @@ def main():
     else:
         gamma = 0.8
         normalize = False
+    if os.environ.get("KOOPMAN_NORMALIZE") == "1":   # e.g. normalized Kinova runs for the auxiliary-loss study
+        normalize = True
 
     # --- Call the main training function with parsed arguments ---
     train(project_name=args.project_name,
