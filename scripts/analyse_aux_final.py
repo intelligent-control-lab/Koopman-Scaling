@@ -57,7 +57,7 @@ try:
         c, ls = style[a]
         ax[0].plot(left.index, left[a], ls, color=c, marker="o", label=a, lw=2)
         ax[1].plot(right.index + n_x, right[a], ls, color=c, marker="o", label=a, lw=2)
-    for k, x in ((0, "Training windows $m$"), (1, "Latent dimension $n$")):
+    for k, x in ((0, "Training windows $m_{\\mathrm{win}}$"), (1, "Latent dimension $n$")):
         ax[k].set_xscale("log", base=10 if k == 0 else 2)
         ax[k].set_xlabel(x, fontsize=13)
         ax[k].set_ylabel("Survival Steps", fontsize=13)

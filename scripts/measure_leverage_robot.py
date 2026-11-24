@@ -40,7 +40,7 @@ def main():
     rows = []
     for d in sorted(glob.glob(runs_glob)):
         g = re.search(rf"aux_final_{env}_(\w+?)__m(\d+)_nm(\d+)_s(\d+)", d)
-        if not g or g.group(1) not in arms:
+        if not g or g.group(1) not in arms or (os.environ.get("M_ONLY") and g.group(2) != os.environ["M_ONLY"]):
             continue
         ck = sorted(glob.glob(os.path.join(d, "best_models", "*.pth")))
         if not ck:
@@ -59,7 +59,7 @@ def main():
         k = np.max(np.sum((P[h:] @ W) ** 2, axis=1))
         rows.append(dict(env=env, arm=g.group(1), m=int(g.group(2)), nm=int(g.group(3)), seed=int(g.group(4)), n=n,
                          rank=int(keep.sum()), kappa=float(k), kappa_over_n=float(k / n),
-                         cond=float(lam.max() / lam[keep].min())))
+                         cond=float(lam.max() / lam[keep].min()), lam_min=float(lam.min()), lam_max=float(lam.max())))
         print(f"{env} {g.group(1)} m={g.group(2)} nm={g.group(3)} s={g.group(4)} n={n} rank={keep.sum()} "
               f"kappa/n={k / n:.1f}", flush=True)
     import pandas as pd

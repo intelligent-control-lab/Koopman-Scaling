@@ -31,7 +31,8 @@ MULTS = tuple(int(k) for k in os.environ.get("MULTS", "1 2 4 8 16 32").split())
 
 M_GRID = (5, 10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 8000)
 R = 40
-OUT = os.path.join(HERE, "..", "log", "fixed_feature_study.csv")
+OUT = os.path.join(HERE, "..", "log", os.environ.get("FFS_OUT", "fixed_feature_study.csv"))
+REF = os.path.join(HERE, "..", "log", "ffs_reference_pool.npz")   # independent pool (make_reference_pool.py)
 
 
 def encoder(seed, mult):
@@ -59,6 +60,11 @@ def rel_err(pred, target):
     return float(np.mean(np.sqrt(np.mean((pred - target) ** 2, axis=0) / np.mean(target ** 2, axis=0))))
 
 
+def rel_mse(a, b, scale):
+    """Mean over state coordinates of E[(a - b)^2] / E[x+^2]."""
+    return float(np.mean(np.mean((a - b) ** 2, axis=0) / scale))
+
+
 def main():
     data = torch.load(E.DATASET, weights_only=False)
     W_all = np.asarray(data["Ktrain_data"])
@@ -66,22 +72,27 @@ def main():
     rng = np.random.default_rng(0)
     with open(OUT, "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["seed", "mult", "n", "kappa", "m", "draw", "dG", "eps_samp", "eps_tot", "rank_def"])
+        w.writerow(["seed", "mult", "n", "kappa", "m", "draw", "dG", "eps_samp", "eps_tot", "rank_def",
+                    "mse_proj", "mse_samp", "mse_tot", "mse_cross"])
+        Wref_all = np.load(REF)["windows"]                       # independent of the regression pool
         for seed in SEEDS:
             perm = permutation(seed, W_all.shape[1])
             pool, ev = perm[8000:16000], perm[4000:8000]
             for mult in MULTS:
                 enc, n = encoder(seed, mult)
                 P_psi, P_zn, _ = regress(enc, W_all[:, pool])
+                R_psi, R_zn, _ = regress(enc, Wref_all)
                 E_psi, _, E_xn = regress(enc, W_all[:, ev])
-                Pp, Pz = P_psi.reshape(-1, n + 1), P_zn.reshape(-1, n)
+                Rp, Rz = R_psi.reshape(-1, n + 1), R_zn.reshape(-1, n)
                 Ep, Ex = E_psi.reshape(-1, n + 1), E_xn.reshape(-1, 2)
-                G = Pp.T @ Pp / len(Pp)
+                scale = np.mean(Ex ** 2, axis=0)
+                G = Rp.T @ Rp / len(Rp)                           # reference Gram (population proxy)
                 lam, V = np.linalg.eigh(G)
                 Gmh = V @ np.diag(lam ** -0.5) @ V.T
                 kappa = float(np.max(np.einsum("ij,jk,ik->i", Ep, np.linalg.inv(G), Ep)))
-                M_ref = np.linalg.lstsq(Pp, Pz, rcond=None)[0]
+                M_ref = np.linalg.lstsq(Rp, Rz, rcond=None)[0]
                 ref_pred = (Ep @ M_ref)[:, :2]
+                mse_proj = rel_mse(ref_pred, Ex, scale)
                 for m in M_GRID:
                     for r in range(R):
                         win = rng.choice(len(pool), size=m, replace=False)
@@ -93,8 +104,10 @@ def main():
                         with np.errstate(all="ignore"):
                             pred = (Ep @ Mm)[:, :2]
                             es, et = rel_err(pred, ref_pred), rel_err(pred, Ex)
-                        w.writerow([seed, mult, n, kappa, m, r, dG, es, et, int(np.linalg.matrix_rank(X) < n + 1)])
-                print(f"seed={seed} n={n} kappa={kappa:.0f} ({kappa / (n + 1):.1f}(n+1))", flush=True)
+                            ms, mt = rel_mse(pred, ref_pred, scale), rel_mse(pred, Ex, scale)
+                        w.writerow([seed, mult, n, kappa, m, r, dG, es, et, int(np.linalg.matrix_rank(X) < n + 1),
+                                    mse_proj, ms, mt, mt - mse_proj - ms])
+                print(f"seed={seed} n={n} kappa={kappa:.0f} ({kappa / (n + 1):.1f}(n+1)) proj={mse_proj:.2e}", flush=True)
 
 
 if __name__ == "__main__":
