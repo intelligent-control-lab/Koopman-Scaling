@@ -52,11 +52,12 @@ try:
     style = {"Baseline": ("tab:blue", "-"), "+Cov": ("tab:orange", "--"), "+Ctrl": ("tab:green", "--"),
              "+Both": ("tab:red", "-")}
     fig, ax = plt.subplots(1, 2, figsize=(8, 3.2))
+    n_x = {"g1": 53, "go2": 35}[d.project.iloc[0].split("_")[2].lower()]   # latent dimension n = n_x + n_enc
     for a in ARMS:
         c, ls = style[a]
         ax[0].plot(left.index, left[a], ls, color=c, marker="o", label=a, lw=2)
-        ax[1].plot(right.index, right[a], ls, color=c, marker="o", label=a, lw=2)
-    for k, x in ((0, "Training Samples"), (1, "Latent Dimension")):
+        ax[1].plot(right.index + n_x, right[a], ls, color=c, marker="o", label=a, lw=2)
+    for k, x in ((0, "Training windows $m$"), (1, "Latent dimension $n$")):
         ax[k].set_xscale("log", base=10 if k == 0 else 2)
         ax[k].set_xlabel(x, fontsize=13)
         ax[k].set_ylabel("Survival Steps", fontsize=13)

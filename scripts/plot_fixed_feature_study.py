@@ -60,11 +60,11 @@ with plt.rc_context(rc):
     ok = np.isfinite(r.m50)
     c1 = np.exp(np.mean(np.log(r.m50[ok]) - np.log(N[ok] * np.log(N[ok]))))
     c2 = np.exp(np.mean(np.log(r.m50[ok]) - np.log(N[ok])))
-    ax[3].plot(x, c1 * x * np.log(x), "-", color="C3", label=f"${c1:.1f}\\,N\\ln N$")
+    ax[3].plot(x, c1 * x * np.log(x), "-", color="C3", label=f"${c1:.1f}\\,N\\log N$")
     ax[3].plot(x, c2 * x, ":", color="C0", label=f"${c2:.0f}\\,N$")
     ax[0].set(xscale="log", yscale="log", xlabel="i.i.d. transitions $m$", ylabel="sampling error (relative)",
               title="(a) Sampling error")
-    ax[1].set(xscale="log", xlabel="$m/(N\\ln N)$, $N=n+1$", ylabel="P($\\|\\Delta\\tilde G\\|\\leq 1/2$)",
+    ax[1].set(xscale="log", xlabel="$m/(N\\log N)$, $N=n+1$", ylabel="P($\\|\\Delta\\tilde G\\|\\leq 1/2$)",
               title="(b) Stability event of Prop. 1")
     ax[2].set(xscale="log", yscale="log", xlabel="i.i.d. transitions $m$", ylabel="one-step state error (relative)",
               title="(c) Total error", ylim=(0.0082, 0.017))
