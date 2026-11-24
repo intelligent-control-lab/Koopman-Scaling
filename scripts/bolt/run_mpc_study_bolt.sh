@@ -19,7 +19,7 @@ echo "[bolt] python: $PY ENV=$ENV STAGE=$STAGE"
 ROOT=$(realpath ..); OUT=$ROOT/log/mpc_study_$ENV; mkdir -p "$OUT"; NORM=$ROOT/data/norm/${ENV}_norm.npz
 trap 'mkdir -p "$ART"; cp -r "$OUT" "$ART"/' EXIT
 rows() { [ -f "$1" ] && $PY -c "import pandas as pd,sys; print(len(pd.read_csv(sys.argv[1])))" "$1" || echo 0; }
-mk() { echo "env_name,model_path" > "$1"; shift; for f in "$@"; do echo "$ENV,$f" >> "$1.tmp"; done; cat "$1.tmp" >> "$1"; rm -f "$1.tmp"; }
+mk() { local out=$1; shift; echo "env_name,model_path" > "$out"; for f in "$@"; do echo "$ENV,$f" >> "$out"; done; echo "[mk] $out: $# models"; }
 track() {  # models_csv out_csv traj_start num_trajs gpu timeout args...: one model per Isaac process
   local m=$1 o=$2 t0=$3 nt=$4 g=$5 to=$6; shift 6; local total before fails=0; total=$(rows "$m")
   while :; do

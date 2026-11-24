@@ -46,26 +46,11 @@ diff = seedmean["+Both"] - seedmean["Baseline"]
 print(f"  +Both - Baseline per seed: {diff.round(2).tolist()}  (positive in {(diff > 0).sum()}/{len(diff)} seeds)")
 
 try:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    style = {"Baseline": ("tab:blue", "-"), "+Cov": ("tab:orange", "--"), "+Ctrl": ("tab:green", "--"),
-             "+Both": ("tab:red", "-")}
-    fig, ax = plt.subplots(1, 2, figsize=(8, 3.2))
-    n_x = {"g1": 53, "go2": 35}[d.project.iloc[0].split("_")[2].lower()]   # latent dimension n = n_x + n_enc
-    for a in ARMS:
-        c, ls = style[a]
-        ax[0].plot(left.index, left[a], ls, color=c, marker="o", label=a, lw=2)
-        ax[1].plot(right.index + n_x, right[a], ls, color=c, marker="o", label=a, lw=2)
-    for k, x in ((0, "Training windows $m$"), (1, "Latent dimension $n$")):
-        ax[k].set_xscale("log", base=10 if k == 0 else 2)
-        ax[k].set_xlabel(x, fontsize=13)
-        ax[k].set_ylabel("Survival Steps", fontsize=13)
-        ax[k].grid(True, ls="--", alpha=0.4)
-        ax[k].legend(ncol=2, fontsize=9)
-    fig.tight_layout()
+    sys.path.insert(0, "/Users/abu/Documents/Code/Others/koopman/koopman_scaling_paper/tools")
+    import paper_style
     env = d.project.iloc[0].split("_")[2].lower()
-    fig.savefig(os.path.join(out, f"{env}_control_tuned.pdf"), bbox_inches="tight")
+    n_x = {"g1": 53, "go2": 35}[env]   # latent dimension n = n_x + n_enc
+    paper_style.control_panels(left, right, n_x, "Survival steps", os.path.join(out, f"{env}_control_tuned.pdf"))
     print("\nwrote", os.path.join(out, f"{env}_control_tuned.pdf"))
 except ImportError:
     pass

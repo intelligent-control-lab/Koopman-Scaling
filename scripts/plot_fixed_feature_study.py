@@ -32,10 +32,11 @@ def m50(g):
     return float(np.exp(np.interp(0.5, [pv[i - 1], pv[i]], [np.log(ms[i - 1]), np.log(ms[i])])))
 
 
-rc = {"font.family": "serif", "font.serif": ["Times New Roman", "Times", "DejaVu Serif"], "font.size": 8,
-      "axes.titlesize": 9, "axes.labelsize": 9, "legend.fontsize": 6.5, "pdf.fonttype": 42}
+sys.path.insert(0, "/Users/abu/Documents/Code/Others/koopman/koopman_scaling_paper/tools")
+import paper_style  # noqa: E402
+rc = dict(paper_style.RC, **{"legend.fontsize": 6})
 with plt.rc_context(rc):
-    fig, axs = plt.subplots(1, 3, figsize=(10.5, 2.9), constrained_layout=True)
+    fig, axs = plt.subplots(1, 3, figsize=(paper_style.FULL_W, 2.05), constrained_layout=True)
     ax = [axs[0], None, axs[1], axs[2]]
     for n, g in d.groupby("n"):
         per_seed = g.groupby(["m", "seed"]).agg(es=("eps_samp", "median"), mt=("mse_tot", "median"),
@@ -44,9 +45,9 @@ with plt.rc_context(rc):
                                       mt=("mt", "median"), pg=("pg", "mean"))
         m = s.index.values
         lab = f"$n={n}$"
-        ax[0].plot(m, s.es, "o-", color=cols[n], ms=2.5, label=lab)
+        ax[0].plot(m, s.es, "o-", color=cols[n], ms=2, lw=1, label=lab)
         ax[0].fill_between(m, s.es_lo, s.es_hi, color=cols[n], alpha=0.15, lw=0)
-        ax[2].plot(m, s.mt, "o-", color=cols[n], ms=2.5, label=lab)
+        ax[2].plot(m, s.mt, "o-", color=cols[n], ms=2, lw=1, label=lab)
         ax[2].axhline(g.mse_proj.median(), color=cols[n], ls=":", lw=1)
     mref = np.array([80, 8000])
     ax[0].plot(mref, 0.03 * (mref / 80) ** -0.5, "k--", lw=1, label="$\\propto m^{-1/2}$")
@@ -54,11 +55,12 @@ with plt.rc_context(rc):
                      columns=["n", "seed", "kappa", "m50"])
     N = r.n
     fin = np.isfinite(r.m50)
-    sc = ax[3].scatter(N[fin], r.m50[fin], c=np.log10(r.kappa[fin] / N[fin]), cmap="plasma", s=14, vmin=0.7, vmax=1.9,
+    sc = ax[3].scatter(N[fin], r.m50[fin], c=np.log10(r.kappa[fin] / N[fin]), cmap="plasma", s=7, vmin=0.7, vmax=1.9,
                        label="per seed", zorder=3)
     ax[3].scatter(N[~fin], np.full((~fin).sum(), d.m.max()), marker="^", facecolors="none",
-                  edgecolors="k", s=22, label="not reached", zorder=3)
+                  edgecolors="k", s=12, label="not reached", zorder=3)
     cb = fig.colorbar(sc, ax=ax[3], pad=0.01); cb.set_label("$\\log_{10}(\\hat\\kappa/n)$", fontsize=7)
+    cb.ax.tick_params(labelsize=6)
     med = r.groupby("n").m50.median()
     Nm = med.index.values
     x = np.geomspace(Nm.min(), Nm.max(), 100)
@@ -67,13 +69,19 @@ with plt.rc_context(rc):
     c2 = np.exp(np.mean(np.log(r.m50[ok]) - np.log(N[ok])))
     ax[3].plot(x, c1 * x * np.log(x), "-", color="C3", label=f"${c1:.1f}\\,n\\log n$")
     ax[3].plot(x, c2 * x, ":", color="C0", label=f"${c2:.0f}\\,n$")
-    ax[0].set(xscale="log", yscale="log", xlabel="i.i.d. transitions $m$", ylabel="sampling error (relative)",
+    ax[0].set(xscale="log", yscale="log", xlabel="i.i.d. transitions $m$", ylabel="Sampling error (relative)",
               title="(a) Sampling error")
-    ax[2].set(xscale="log", yscale="log", xlabel="i.i.d. transitions $m$", ylabel="one-step state MSE (relative)",
+    ax[2].set(xscale="log", yscale="log", xlabel="i.i.d. transitions $m$", ylabel="One-step state MSE (relative)",
               title="(b) Total error; dotted: projection", ylim=(1.2e-4, 4e-4))
-    ax[3].set(xscale="log", yscale="log", xlabel="latent dimension $n$", ylabel="$m_{50}$ (transitions)",
+    ax[3].set(xscale="log", yscale="log", xlabel="Latent dimension $n$", ylabel="$m_{50}$ (transitions)",
               title="(c) Data threshold")
+    import matplotlib.ticker as mt
+    ax[3].xaxis.set_major_locator(mt.FixedLocator(ns)); ax[3].xaxis.set_major_formatter(mt.FixedFormatter([str(v) for v in ns]))
+    ax[3].xaxis.set_minor_formatter(mt.NullFormatter())
+    for a in (ax[0], ax[2]):
+        a.yaxis.set_minor_formatter(mt.FuncFormatter(paper_style.minor_log_label) if a.get_ylim()[1] / a.get_ylim()[0] < 10
+                                    else mt.NullFormatter())
     for a in axs:
-        a.grid(True, which="both", ls="--", alpha=0.4)
+        a.grid(True, which="major", ls="--")
         a.legend(frameon=True, ncol=1)
     fig.savefig(sys.argv[1])

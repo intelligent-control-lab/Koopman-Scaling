@@ -13,7 +13,7 @@ permissions:
   viewers: phi-rob
 resources:
   docker_image: docker.apple.com/phi-robotics/phimotion:isaacsim5.1
-  timeout: 1d
+  timeout: 3d
   task_type: 8gpu
   cluster: aws_10
 cluster_options:
