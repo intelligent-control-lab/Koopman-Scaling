@@ -12,6 +12,7 @@ Grid: horizon H, input weight R (on normalized inputs), and the joint-velocity r
   fd   : reference velocity from finite differences of the IK joint reference, weight Q_vel
 The original controller is H=15, R=0, (zero, Q_vel=1).
 
+MODE=bothfinal trains the selected +Both setting (BOTH_WCOV, BOTH_WCTRL, BOTH_STEPS) on the full grid.
 MODE=bothsel instead trains a wider +Both sweep for selection (m = 140k, n_mult in {1, 4, 16}, two seeds):
 w_cov in {0.01, 0.1, 1} x w_ctrl in {0.1, 1, 3} x train_steps in {120k, 240k}; the loss setting and the MPC
 setting are then selected jointly on the star trajectory (projects ftune_bothsel_*).
@@ -181,6 +182,11 @@ def evaluate(item):
 
 
 def runs():
+    if MODE == "bothfinal":     # the +Both setting selected on the star trajectory, on the full grid
+        c, u, st = float(os.environ["BOTH_WCOV"]), float(os.environ["BOTH_WCTRL"]), int(os.environ["BOTH_STEPS"])
+        out = [dict(arm="both", steps=st, wcov=c, wctrl=u, m=m, nm=nm, seed=seed)
+               for m in (1000, 4000, 16000, 64000, 140000) for nm in (1, 2, 4, 8, 16) for seed in ft.SEEDS5]
+        return [r for i, r in enumerate(out) if i % ft.NSHARDS == ft.SHARD]
     if MODE != "bothsel":
         return ft.runs()
     out = [dict(arm="both", steps=st, wcov=c, wctrl=u, m=140000, nm=nm, seed=seed)
