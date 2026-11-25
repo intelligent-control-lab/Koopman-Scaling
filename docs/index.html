@@ -73,7 +73,7 @@ i.v{font-family:var(--math);font-style:italic}
 .btn svg{width:17px;height:17px;fill:currentColor}
 @media (prefers-reduced-motion:reduce){.btn,.btn:hover{transition:none;transform:none}}
 
-.hero{position:relative;min-height:100vh;display:flex;align-items:center;overflow:hidden;background:radial-gradient(1200px 700px at 70% 30%,#12304a 0%,var(--night) 60%);color:#f5f5f7}
+.hero{position:relative;min-height:80vh;display:flex;align-items:center;overflow:hidden;background:radial-gradient(1200px 700px at 70% 30%,#12304a 0%,var(--night) 60%);color:#f5f5f7}
 #phase{position:absolute;inset:0;width:100%;height:100%;opacity:.5}
 .hero .inner{position:relative;z-index:2;padding:108px 24px 40px;text-align:center}
 .hero h1{font-size:clamp(34px,5.2vw,66px);line-height:1.04;letter-spacing:-.035em;font-weight:700;margin:0 auto 16px;max-width:980px}
@@ -90,7 +90,8 @@ i.v{font-family:var(--math);font-style:italic}
 .hero .cap button{font:inherit;font-size:13px;font-weight:600;padding:5px 12px;border-radius:980px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#f5f5f7;cursor:pointer}
 .hero .cap button:hover{background:rgba(255,255,255,.16)}
 
-section{padding:110px 0}
+section{padding:64px 0}
+@media (max-width:768px){section{padding:40px 0}}
 section.gray{background:var(--bg-2)}
 section.dark{background:var(--night);color:#f5f5f7}
 section.dark .sub{color:rgba(245,245,247,.7)}
@@ -112,6 +113,20 @@ section.dark .card{background:var(--night-2);box-shadow:none;border:1px solid rg
 .feature p{margin:0;color:var(--ink-2);font-size:15.5px}
 
 .demo{margin-top:52px}
+.tabs{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:12px 16px;border-bottom:1px solid #ececf0;background:#fafafc}
+.tabs [role=tab]{font:inherit;font-size:14px;font-weight:600;padding:7px 16px;border-radius:980px;border:1px solid var(--line);background:#fff;color:var(--ink-2);cursor:pointer}
+.tabs [role=tab][aria-selected=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.tabs-note{margin-left:auto;font-size:13px;color:var(--ink-3)}
+.panel-lead{margin:0;font-size:15px;color:var(--ink-2)}
+.demo-head{padding:22px 26px 6px}
+.demo-head p{margin:6px 0 0;font-size:15px;color:var(--ink-2);max-width:860px}
+.dk{background:var(--night-2);color:#f5f5f7}
+.dk .stage{background:linear-gradient(180deg,#0f1a2e,#0b1324)}
+.dk .side{border-left-color:rgba(255,255,255,.08)}
+.dk .plot{background:#0d1628;border-color:rgba(255,255,255,.08)}
+.dk .legend,.dk .panel-lead{color:rgba(245,245,247,.7)}
+.dk .ro{background:rgba(255,255,255,.06)}
+.dk .ro .l{color:rgba(245,245,247,.55)}
 .demo-body{display:grid;grid-template-columns:1.05fr 1fr}
 @media (max-width:900px){.demo-body{grid-template-columns:1fr}}
 .stage{position:relative;background:linear-gradient(180deg,#fbfbfd,#f2f4f7);min-height:400px}
@@ -269,7 +284,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
   .hero h1 .grad{background:none!important;-webkit-text-fill-color:currentColor;color:var(--teal)!important}
   .hero .q,.hero .bound,.hero .bound-cap,.hero .authors,.hero .affil,.hero .cap{color:#1d1d1f!important}
   .card{box-shadow:none!important;border:1px solid #d2d2d7;break-inside:avoid}
-  section.dark,.insight,section.dark .stage,section.dark .plot{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .dk,.dk .stage,.dk .plot,section.dark,.insight,section.dark .stage,section.dark .plot{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   canvas,svg,img{max-width:100%!important}
   .xplots,.grid2,.grid3,.takeaways{gap:14px}
   details>summary{display:none}
@@ -282,7 +297,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
   <div class="wrap">
     <a class="brand" href="#top">Koopman Scaling Law</a>
     <nav aria-label="Sections">
-      <a href="#law">Explorer</a><a href="#leverage">Leverage</a><a href="#demos">Demos</a><a href="#method">Method</a><a href="#results">Results</a><a href="#tools">Estimator</a><a href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener">Code</a>
+      <a href="#overview">Overview</a><a href="#dynamics">Linear dynamics</a><a href="#law">Scaling law</a><a href="#leverage">Leverage</a><a href="#control-sec">Control</a><a href="#resources">Resources</a><a href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener">Code</a>
     </nav>
   </div>
 </header>
@@ -295,57 +310,120 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
     <h1>Scaling Law of <span class="grad">Neural Koopman Operators</span></h1>
     <p class="q">How much data does a robot need to learn a useful dynamical representation?</p>
     <div class="bound" role="img" aria-label="Error bound: epsilon of n and m is at most of the order of the square root of kappa n times log n over m, plus n to the power minus beta">
-      \[\varepsilon(n,m)\lesssim\textcolor{#ffa36b}{\sqrt{\frac{\kappa_n\ln n}{m}}}+\textcolor{#b9adff}{n^{-\beta}}\]
+      \[\varepsilon(n,m)\lesssim\textcolor{#ffa36b}{\sqrt{\frac{\kappa_n\log n}{m}}}+\textcolor{#b9adff}{n^{-\beta}}\]
     </div>
-    <p class="bound-cap">Sampling error from \(m\) samples plus projection error from latent size \(n\); \(\kappa_n\ge n\) is the leverage of the learned features.</p>
+    <p class="bound-cap"><span style="color:#ffa36b">Sampling error</span> from \(m\) samples plus <span style="color:#b9adff">projection error</span> from latent size \(n\); \(\kappa_n\ge n\) is the leverage of the learned features.</p>
     <div class="authors">Abulikemu Abuduweili, Yuyang Pang, Feihan Li, and Changliu Liu</div>
     <div class="affil">Robotics Institute, Carnegie Mellon University</div>
     <div class="buttons">
       <a class="btn primary" href="https://arxiv.org/abs/2602.19943" rel="noopener">Paper</a>
       <a class="btn ghost" href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Code</a>
-      <a class="btn ghost" href="#law">Explore</a>
     </div>
     <div class="cap"><span>Background: phase portrait of a simulated damped pendulum (angle vs. angular velocity).</span><button type="button" id="hero-pause" class="anim-toggle">Pause animations</button></div>
   </div>
 </div>
 
-<section id="findings">
+<section id="overview">
   <div class="wrap">
-    <div class="text center reveal" style="max-width:820px;text-align:left">
-      <p class="kicker" style="text-align:center">Overview</p>
-      <h2 class="center" style="text-align:center">Key findings</h2>
-      <p class="abs">A neural Koopman model represents a nonlinear robot by linear dynamics in a learned latent space, which makes prediction and control fast. We bound its error by a sampling term and a projection term. The bound shows that the data a latent space needs depends on its dimension and on its leverage, which measures how unevenly the learned features weight different states. We test the analysis on six systems, from a damped pendulum to a humanoid robot, including real-robot data from a Kinova arm.</p>
+    <div class="text center reveal" style="max-width:840px">
+      <p class="kicker">01 · Overview</p>
+      <p class="abs" style="text-align:left">Neural Koopman models learn representations in which nonlinear dynamics can be approximated by linear systems, enabling efficient prediction and control. But how large should the representation be, and how much data is needed to learn it? We show that the answer depends on both latent dimension and leverage, a measure of how unevenly the representation captures different states. Theory and experiments across six mechanical and robotic systems give practical guidance for scaling data, choosing model capacity, and learning representations for control.</p>
     </div>
-    <div class="grid2" style="margin-top:44px">
-      <div class="card feature reveal"><div class="big">\(m\gtrsim\kappa_n\ln n\)</div><h3>A sufficient data scale</h3><p>With this much data, the error bound holds. It is a worst-case sufficient condition, not an exact empirical law.</p></div>
-      <div class="card feature reveal"><div class="big">30% lower error</div><h3>Leverage predicts the data a model needs</h3><p>Adding the estimated leverage to the \(N\ln N\) law lowers the held-out error of the predicted sample threshold by 30%.</p></div>
-      <div class="card feature reveal"><div class="big">+49%, +6%, −12%</div><h3>Auxiliary losses help control</h3><p>Two auxiliary losses raise mean tracking survival on the Go2 quadruped (+49%) and the G1 humanoid (+6%), and lower the Franka tracking error by 12% relative to the Koopman baseline.</p></div>
-      <div class="card feature reveal"><div class="big">prediction ≠ control</div><h3>Structure matters in closed loop</h3><p>An unstructured neural dynamics model predicts best on G1 and Go2 but performs poorly with random-shooting MPC.</p></div>
+    <div class="grid3" style="margin-top:28px">
+      <div class="card feature reveal"><span class="tag schem" style="margin:0 0 10px">Theory</span><div class="big">\(m\gtrsim\kappa_n\log n\)</div><h3>Scale data with capacity</h3><p>Sample requirements depend on both latent dimension and representation geometry.</p></div>
+      <div class="card feature reveal"><span class="tag schem" style="margin:0 0 10px">Empirical</span><div class="big">30%</div><h3>Leverage matters</h3><p>Lower held-out threshold-prediction error in the fixed-feature pendulum study.</p></div>
+      <div class="card feature reveal"><span class="tag schem" style="margin:0 0 10px">Control</span><div class="big">+49%</div><h3>Prediction is not enough</h3><p>Longer Go2 tracking survival in simulation with representation regularization.</p></div>
     </div>
   </div>
 </section>
 
-<section id="law" class="gray">
+<section id="dynamics" class="gray">
+  <div class="wrap">
+    <div class="center text reveal" style="max-width:820px">
+      <p class="kicker">02 · Learning linear dynamics</p>
+      <h2>A linear model of a nonlinear robot</h2>
+      <p class="sub">Learn nonlinear features of the physical state so that its evolution can be approximated by linear dynamics, \(z^+=Az+Bu\).</p>
+    </div>
+    <figure class="card reveal" style="margin-top:28px">
+      <div class="fig"><img src="assets/fig_architecture.png" alt="Neural Koopman architecture: an encoder maps the state x to a latent state z; the latent state changes linearly, z+ = Az + Bu; the state is read back from z" style="max-width:820px;width:100%" loading="lazy"></div>
+      <figcaption>The latent state \(z=[x;\Psi_\theta(x)]\) contains the physical state \(x\) and the learned features, so \(x\) can be read back; its size is \(n=n_x+n_{\text{enc}}\).</figcaption>
+    </figure>
+    <div class="card demo reveal" style="margin-top:20px">
+      <div class="tabs" role="tablist" aria-label="Pendulum demos">
+        <button type="button" role="tab" id="tab-predict" aria-controls="predict" aria-selected="true">Prediction</button>
+        <button type="button" role="tab" id="tab-control" aria-controls="control" aria-selected="false" tabindex="-1">Control</button>
+        <span class="tabs-note">A learned pendulum model running in your browser.</span>
+      </div>
+      <div id="predict" role="tabpanel" aria-labelledby="tab-predict">
+        <div class="demo-body">
+          <div class="stage"><canvas id="cv-pred" role="img" aria-label="The true pendulum and the forecast of the learned model"></canvas></div>
+          <div class="side">
+            <p class="panel-lead">Black: true pendulum. Teal: forecast that encodes the state once and then applies only the linear update; it restarts from the true state after the forecast length.</p>
+            <div class="controls">
+              <span class="ctl-label">Forecast length</span>
+              <div class="seg" role="group" aria-label="Forecast length">
+                <button data-h="0.5" aria-pressed="false">0.5 s</button><button data-h="1" aria-pressed="true">1 s</button><button data-h="2" aria-pressed="false">2 s</button>
+              </div>
+            </div>
+            <div class="controls">
+              <label><input type="checkbox" id="pred-force" checked> Random torque input</label>
+              <button class="btn line sm" id="pred-reset">New start</button>
+            </div>
+            <canvas class="plot" id="pl-pred" aria-label="Pendulum angle over time: true and predicted"></canvas>
+            <div class="legend"><span><span class="sw" style="border-color:#1d1d1f"></span>true angle</span><span><span class="sw" style="border-color:#0e9f8f"></span>forecast</span><span><span class="sw" style="border-color:#e8590c;border-top-style:dotted"></span>torque</span></div>
+            <div>
+              <div class="legend" style="margin-bottom:6px"><span>The 18 values of the latent state \(z\)</span></div>
+              <canvas class="latent" id="lat" aria-label="Bars that show the 18 values of the latent state"></canvas>
+            </div>
+            <div class="readouts">
+              <div class="ro"><div class="l">Time left</div><div class="n" id="ro-h">–</div></div>
+              <div class="ro"><div class="l">Angle error</div><div class="n" id="ro-e">–</div></div>
+              <div class="ro"><div class="l">Latent size</div><div class="n">18</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="control" role="tabpanel" aria-labelledby="tab-control" class="dk" hidden>
+        <div class="demo-body">
+          <div class="stage"><canvas id="cv-ctrl" role="img" aria-label="Pendulum controlled by MPC on the learned linear model"></canvas></div>
+          <div class="side">
+            <p class="panel-lead">MPC plans 15 steps ahead with the linear model and applies the first input at every step. Change the target angle or push the pendulum.</p>
+            <div class="controls">
+              <label for="tgt">Target angle</label><input id="tgt" type="range" min="-30" max="30" step="1" value="25"><span id="tgt-v" style="font-weight:700;min-width:44px">25°</span>
+              <button class="btn primary sm" id="push">Push</button>
+            </div>
+            <canvas class="plot" id="pl-ctrl" aria-label="Angle and target angle over time"></canvas>
+            <div class="legend"><span><span class="sw" style="border-color:#f5f5f7"></span>angle</span><span><span class="sw" style="border-color:#34d3c0;border-top-style:dashed"></span>target</span><span><span class="sw" style="border-color:#e8590c"></span>torque (limit ±8)</span></div>
+            <div class="readouts">
+              <div class="ro"><div class="l">Angle</div><div class="n" id="rc-a">–</div></div>
+              <div class="ro"><div class="l">Error</div><div class="n" id="rc-e">–</div></div>
+              <div class="ro"><div class="l">Torque</div><div class="n" id="rc-u">–</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <details><summary>Details</summary><p class="note">The demo model was trained with <code>scripts/export_page_demo.py</code> on swings up to ±90° with random torques; \(A\) and \(B\) were then refitted by least squares (EDMD) on new data. Median test angle error: <span id="err-stats">1.1° after 0.3 s, 3.1° after 1 s, and 3.5° after 2 s</span>. To hold an angle, the controller finds the constant torque that balances gravity from the linear model; from random starts, the final error is below 0.7° for all targets between −30° and +30°.</p></details>
+  </div>
+</section>
+
+<section id="law">
   <div class="wrap">
     <div class="center text reveal" style="max-width:860px">
-      <p class="kicker">Theory</p>
-      <h2>Scaling-law explorer</h2>
-      <p class="sub">The sampling error decreases with the number of samples \(m\); the projection error decreases with the latent size \(n\). Their sum is smallest at an intermediate latent size that grows with the data.</p>
-    </div>
-    <div class="card formula reveal">
-      \[\varepsilon(n,m)\lesssim\textcolor{#e8590c}{\sqrt{\frac{\kappa_n\ln n}{m}}}+\textcolor{#6e56cf}{n^{-\beta}}\]
-      <small>\(\beta\): rate at which a larger latent space reduces the projection error. \(p\): growth of the leverage with dimension, \(\kappa_n=n^p\); \(p=1\) is the well-spread case.</small>
+      <p class="kicker">03 · The scaling law</p>
+      <h2>Data and capacity must grow together</h2>
+      <p class="sub">Too little data makes the estimate of the dynamics unreliable; too little representation capacity limits approximation accuracy. The bound in the header combines both terms.</p>
     </div>
 
     <div class="card reveal" style="margin-top:28px;padding:26px">
-      <div class="controls" style="justify-content:space-between;margin-bottom:18px">
-        <h3 style="margin:0">Parameters</h3>
+      <div class="controls" style="justify-content:space-between;margin-bottom:14px">
+        <h3 style="margin:0">Scaling-law explorer</h3>
         <button class="btn line sm" type="button" id="law-reset">Reset</button>
       </div>
       <div class="xctl">
         <div><div class="row"><label for="beta">Projection rate β</label><output id="beta-v" for="beta">0.60</output></div>
           <input id="beta" type="range" min="0.2" max="2" step="0.05" value="0.6"><div class="ends"><span>slow</span><span>fast</span></div></div>
-        <div><div class="row"><label for="pexp">Leverage growth p</label><output id="p-v" for="pexp">1.00</output></div>
+        <div><div class="row"><label for="pexp">Leverage growth p, \(\kappa_n=n^p\)</label><output id="p-v" for="pexp">1.00</output></div>
           <input id="pexp" type="range" min="1" max="2" step="0.05" value="1"><div class="ends"><span>well spread</span><span>concentrated</span></div></div>
         <div><div class="row"><label for="m-sl">Data m</label><output id="m-v" for="m-sl">10,000</output></div>
           <input id="m-sl" type="range" min="3" max="7" step="0.05" value="4"><div class="ends"><span>1,000</span><span>10,000,000</span></div></div>
@@ -353,217 +431,40 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
       <div class="xplots">
         <div>
           <h4>Error for each data size and latent size</h4>
-          <div class="hint">Point or tap to read values. The darker region violates \(m\ge n^p\ln n\).</div>
+          <div class="hint">Point or tap to read values. The darker region violates \(m\ge n^p\log n\).</div>
           <div class="phase-wrap" style="margin-top:10px">
             <canvas id="heat" role="img" aria-label="Heat map of the surrogate error for each data size and latent size. The darker region marks m less than n to the power p times log n."></canvas>
             <div class="tip" id="tip"></div>
           </div>
           <div class="colorbar"><span>low</span><span class="cb" id="cb" style="flex-basis:140px"></span><span>high error</span>
-            <span><span class="sw" style="border-color:#1d1d1f"></span>optimal n</span>
-            <span><span class="sw" style="border-color:#ff6b6b;border-top-style:dashed"></span>\(m=n^p\ln n\)</span>
+            <span><span class="sw" style="border-color:#1d1d1f"></span>surrogate-optimal n</span>
+            <span><span class="sw" style="border-color:#ff6b6b;border-top-style:dashed"></span>\(m=n^p\log n\)</span>
             <span><span class="sw" style="border-color:#34d3c0;border-top-style:dotted"></span>current m</span></div>
         </div>
         <div>
           <h4>Error for one data size</h4>
           <div class="hint">Sampling and projection terms at the current \(m\).</div>
           <svg id="ex" viewBox="0 0 560 350" role="img" aria-label="Surrogate error versus latent size for the chosen data size" style="margin-top:10px"></svg>
-          <div class="legend"><span><span class="sw" style="border-color:#0e9f8f"></span>total</span><span><span class="sw" style="border-color:#e8590c;border-top-style:dashed"></span>sampling</span><span><span class="sw" style="border-color:#6e56cf;border-top-style:dotted"></span>projection</span><span><span class="sw" style="border-color:#f3b8bd;border-top-width:8px"></span>\(m&lt;n^p\ln n\)</span></div>
+          <div class="legend"><span><span class="sw" style="border-color:#0e9f8f"></span>total</span><span><span class="sw" style="border-color:#e8590c;border-top-style:dashed"></span>sampling</span><span><span class="sw" style="border-color:#6e56cf;border-top-style:dotted"></span>projection</span><span><span class="sw" style="border-color:#f3b8bd;border-top-width:8px"></span>\(m&lt;n^p\log n\)</span></div>
         </div>
       </div>
-      <div class="readouts math" style="margin-top:22px" aria-live="polite">
-        <div class="ro"><div class="l">Optimal latent size n</div><div class="n" id="ro-nstar">–</div></div>
+      <div class="readouts math" style="margin-top:20px" aria-live="polite">
+        <div class="ro"><div class="l">Surrogate-optimal latent size</div><div class="n" id="ro-nstar">–</div></div>
         <div class="ro"><div class="l">Exponent \(1/(p+2\beta)\)</div><div class="n" id="ro-exp">–</div></div>
-        <div class="ro"><div class="l">\(m\ge n^p\ln n\) holds for</div><div class="n" id="ro-cond">–</div></div>
+        <div class="ro"><div class="l">\(m\ge n^p\log n\) holds for</div><div class="n" id="ro-cond">–</div></div>
       </div>
-      <p class="xform">Increasing \(m\) raises the optimal latent size; increasing \(p\) lowers it for the same data.</p>
-      <p class="caveat">Illustrative theoretical surrogate with unit constants; not measured results or guaranteed optimal dimensions.</p>
+      <p class="caveat">Illustrative theoretical surrogate with unit constants; not measured results or guaranteed optimal dimensions. Increasing \(m\) raises the surrogate-optimal latent size; increasing \(p\) lowers it.</p>
       <details><summary>Details</summary>
-        <p class="xform">The plots use \(E(n,m)=\sqrt{n^p\ln n/m}+n^{-\beta}\). The optimal latent size is its numerical minimiser over \(n=2\) to \(10{,}000\); the bound-minimising size scales as \(n^\star\asymp(m/\ln m)^{1/(p+2\beta)}\), which is \((m/\ln m)^{1/(1+2\beta)}\) for well-spread spaces. The bound applies once \(m\gtrsim\kappa_n\ln n\), a sufficient, worst-case scale. With \(m=c\,\kappa_n\ln n\), the sampling term stays at \(c^{-1/2}\) for every latent size.</p>
+        <p class="xform">The plots use \(E(n,m)=\sqrt{n^p\log n/m}+n^{-\beta}\) (log is the natural logarithm). The surrogate-optimal latent size is its numerical minimiser over \(n=2\) to \(10{,}000\); the bound-minimising size scales as \(n^\star\asymp(m/\log m)^{1/(p+2\beta)}\), which is \((m/\log m)^{1/(1+2\beta)}\) for well-spread spaces. Under the stated assumptions, \(m\gtrsim\kappa_n\log n\) is a sufficient sample-size scale. With \(m=c\,\kappa_n\log n\), the sampling term stays at \(c^{-1/2}\) for every latent size.</p>
       </details>
     </div>
-  </div>
-</section>
+    <p class="note" style="max-width:none">The theoretical scale concerns independent transitions with fixed features; the neural experiments use trajectory segments of 15 transitions, with up to 140,000 training samples per system.</p>
 
-<section id="leverage">
-  <div class="wrap">
-    <div class="center text reveal" style="max-width:860px">
-      <p class="kicker">Leverage</p>
-      <h2>Why dimension alone is not enough</h2>
-      <p class="sub">Leverage measures how strongly the features concentrate on particular states. If a few rarely sampled states dominate the features, many samples are needed before those states are covered, so two latent spaces of the same dimension can need very different amounts of data.</p>
-    </div>
-    <div class="card formula reveal">
-      \[\kappa_n=\sup_s\,\Phi(s)^\top G_n^{-1}\Phi(s)=\sup_s\big\|G_n^{-1/2}\Phi(s)\big\|^2\ge n\]
-      <small>\(\Phi(s)\): learned features at state \(s\); \(G_n\): their Gram matrix. \(\kappa_n\) depends only on the observable space, not on its basis, and stays close to \(n\) when no state stands out.</small>
-    </div>
-
-    <div class="card reveal illus" style="margin-top:28px;padding:26px" id="illus">
-      <div class="controls" style="justify-content:space-between">
-        <div><h3 style="margin:0">Two observable spaces with the same dimension</h3>
-          <div style="font-size:15px;color:var(--ink-2)">Both spaces have \(n=7\) features on a state \(s\in[0,1]\). Narrowing the bump feature on the right concentrates the leverage and raises \(\kappa\), while \(n\) stays fixed.</div></div>
-        <span class="tag schem" style="margin:0">Illustration, not data</span>
+    <div class="card demo reveal" id="try" style="margin-top:28px">
+      <div class="demo-head">
+        <h3 style="margin:0">Trained models: data size × latent size</h3>
+        <p>21 pendulum models trained with 2 to 16,000 trajectories and three latent sizes. With 2 trajectories the smallest model is best; from 20 trajectories on, the largest is best. Pick a cell to watch that model.</p>
       </div>
-      <div class="xctl" style="grid-template-columns:1fr;max-width:420px;margin-top:16px">
-        <div><div class="row"><label for="bump-w">Width of the bump feature (right panel)</label><output id="bump-v" for="bump-w">–</output></div>
-          <input id="bump-w" type="range" min="0" max="1" step="0.01" value="0.6"><div class="ends"><span>broad</span><span>localized</span></div></div>
-      </div>
-      <div class="grid2" style="margin-top:14px">
-        <div class="panel"><h4>Well spread: Fourier features</h4><svg id="illus-a" viewBox="0 0 360 270" role="img" aria-label="Whitened Fourier features and their flat leverage curve"></svg></div>
-        <div class="panel"><h4>Concentrated: one localized bump feature</h4><svg id="illus-b" viewBox="0 0 360 270" role="img" aria-label="Whitened features with one localized bump and their peaked leverage curve"></svg></div>
-      </div>
-      <div class="legend" style="margin-top:8px"><span><span class="sw" style="border-color:#9aa3ad"></span>whitened features \(G^{-1/2}\Phi(s)\)</span><span><span class="sw" style="border-color:#6e56cf;border-top-width:8px;opacity:.5"></span>leverage \(\ell(s)=\Phi(s)^\top G^{-1}\Phi(s)\)</span><span><span class="sw" style="border-color:#1d1d1f;border-top-style:dashed"></span>mean of \(\ell\) \(=n\)</span></div>
-      <p class="note" id="illus-read" aria-live="polite"></p>
-      <p class="caveat">Same dimension \(n\), different leverage \(\kappa_n\): the concentrated space needs more samples under the bound \(m\gtrsim\kappa_n\ln n\). Gram matrix by quadrature on \([0,1]\); both panels share the leverage axis.</p>
-    </div>
-
-    <div class="center text reveal" style="max-width:860px;margin-top:56px">
-      <h3>A direct test with frozen features</h3>
-      <p class="sub" style="font-size:17px">On the damped pendulum, we freeze learned encoders with latent sizes \(n=4\) to \(66\) (five seeds) and fit \((A,B)\) by least squares on \(m\) independent transitions. \(m_{50}\) is the number of transitions at which the event \(\|\tilde G_{n,m}-I\|\le\tfrac12\), on which the proof rests, holds with probability \(\tfrac12\).</p>
-    </div>
-    <div class="takeaways">
-      <div class="card take reveal"><div class="big">\(m^{-0.50}\) to \(m^{-0.52}\)</div><p><b>Sampling rate.</b> The sampling error decays at the rate the theory predicts, \(m^{-1/2}\).</p></div>
-      <div class="card take reveal"><div class="big">0.3%</div><p><b>Error decomposition.</b> Sampling plus projection error equals the total error to within 0.3%.</p></div>
-      <div class="card take reveal"><div class="big">\(1.80\to1.34\times10^{-4}\)</div><p><b>Trade-off.</b> At fixed \(m\), the sampling error grows with \(n\), while the projection error decreases with \(n\).</p></div>
-    </div>
-
-    <div class="card reveal" style="margin-top:28px;padding:26px" id="lev-card">
-      <div class="controls" style="justify-content:space-between">
-        <div><h3 style="margin:0">Sample threshold of each encoder (Fig. 5c)</h3>
-          <div style="font-size:15px;color:var(--ink-2)">Each dot is one frozen encoder. Higher dots need more transitions; darker dots have higher leverage and need more data than their size alone predicts. Hover, tap, or press Tab for values.</div></div>
-        <div class="controls">
-          <label><input type="checkbox" id="lev-fitN" checked> \(N\ln N\) fit</label>
-          <label><input type="checkbox" id="lev-fitL" checked> Leverage-law fit</label>
-        </div>
-      </div>
-      <div class="lev-scroll"><div class="lev-wrap">
-        <svg id="lev" viewBox="0 0 760 440" role="group" aria-label="Log-log plot of the threshold m50 versus regressor size N for 29 encoders, coloured by leverage ratio"></svg>
-        <div class="tip" id="lev-tip"></div>
-      </div></div>
-      <p id="lev-status" class="note" style="margin-top:0"></p>
-      <div class="colorbar">
-        <span>\(\hat\kappa_r/N\):</span><span id="lev-lo">–</span><span class="cb" id="lev-cb" style="flex-basis:160px"></span><span id="lev-hi">–</span>
-        <span style="margin-left:14px">● reached &nbsp; △ not reached within 8,000 transitions</span>
-        <span><span class="sw" style="border-color:#3a3a3c"></span>\(N\ln N\) fit</span>
-        <span>◇ leverage-law fit (per encoder)</span>
-      </div>
-      <details>
-        <summary>Details and data table</summary>
-        <p class="note">\(N=n+1\) is the size of the regressor \([\Phi(x);u]\), and \(\hat\kappa_r\) is the estimated leverage of that regressor. Fitted laws: \(\ln m_{50}=a+\ln(N\ln N)\) and \(\ln m_{50}=a+\ln(N\ln N)+\eta\ln(\hat\kappa_r/N)\), on the 29 full-rank encoders. Tooltip predictions are leave-one-seed-out. Dots with the same \(N\) are offset horizontally by seed. The full-rank encoder that does not reach the event within 8,000 transitions is right-censored.</p>
-        <p class="note" id="lev-excl"></p>
-        <div class="scroll-x"><table class="dtbl" id="lev-table" aria-label="Per-encoder data of Fig. 5c"></table></div>
-      </details>
-    </div>
-
-    <div class="card reveal" style="margin-top:20px;padding:26px">
-      <h3 style="margin:0 0 4px">Empirical sample-threshold laws (Table 3)</h3>
-      <div style="font-size:15px;color:var(--ink-2);margin-bottom:10px">AIC rewards a good fit and penalises extra parameters; held-out error measures how well each law predicts encoders it has not seen. Lower is better for both.</div>
-      <div class="scroll-x">
-      <table class="t3">
-        <thead><tr><th>Law for \(m_{50}\)</th><th style="text-align:right">AIC</th><th style="text-align:right">Held-out error</th><th class="barcell"><span class="sr" style="position:absolute;left:-9999px">Bar</span></th></tr></thead>
-        <tbody>
-          <tr><td>\(N\)</td><td class="num">59.8</td><td class="num">0.53</td><td class="barcell"><div class="b" style="width:100%"></div></td></tr>
-          <tr><td>\(N\ln N\)</td><td class="num">27.1</td><td class="num">0.26</td><td class="barcell"><div class="b" style="width:49%"></div></td></tr>
-          <tr><td>\(N^p\) \((\hat p=1.64)\)</td><td class="num">7.2</td><td class="num">0.22</td><td class="barcell"><div class="b" style="width:41.5%"></div></td></tr>
-          <tr><td>\(\hat\kappa_r\ln N\)</td><td class="num">36.9</td><td class="num">0.44</td><td class="barcell"><div class="b" style="width:83%"></div></td></tr>
-          <tr class="best"><td>\(N\ln N\,(\hat\kappa_r/N)^\eta\) \((\hat\eta=0.42)\)</td><td class="num">−10.0</td><td class="num">0.18</td><td class="barcell"><div class="b" style="width:34%"></div></td></tr>
-        </tbody>
-      </table>
-      </div>
-      <p class="note">29 full-rank encoders; leave-one-seed-out. Relative to \(N\ln N\), the leverage-adjusted law lowers the held-out error by 30%.</p>
-      <details><summary>Details</summary><p class="note">Held-out error is the leave-one-seed-out RMS error of \(\ln m_{50}\). Deviations from the \(N\ln N\) law correlate with \(\ln(\hat\kappa_r/N)\) (rank correlation 0.84). The fitted dependence on leverage is sublinear (\(\hat\eta\approx0.4\)).</p></details>
-    </div>
-  </div>
-</section>
-
-<section id="demos" class="gray">
-  <div class="wrap">
-    <div class="center text reveal" style="max-width:820px">
-      <p class="kicker">Demos</p>
-      <h2>A linear model of a nonlinear robot</h2>
-      <p class="sub">The encoder maps the state \(x\) to a latent state \(z\) that evolves linearly, \(z^+=Az+Bu\), where \(u\) is the control input. Prediction then needs only matrix products, and MPC reduces to a quadratic problem. The three demos below run a learned pendulum model in your browser.</p>
-    </div>
-    <figure class="card reveal" style="margin-top:48px">
-      <div class="fig"><img src="assets/fig_architecture.png" alt="Neural Koopman architecture: an encoder maps the state x to a latent state z; the latent state changes linearly, z+ = Az + Bu; the state is read back from z" style="max-width:860px;width:100%" loading="lazy"></div>
-      <figcaption>The latent state \(z=[x;\Psi_\theta(x)]\) contains the physical state and the learned features, so \(x\) can always be read back. Its size is \(n=n_x+n_{\text{enc}}\).</figcaption>
-    </figure>
-  </div>
-</section>
-
-<section id="predict">
-  <div class="wrap">
-    <div class="text reveal">
-      <p class="kicker">Demo 1</p>
-      <h2>Prediction</h2>
-      <p class="sub">Black: the true pendulum. Teal: the forecast of the learned model, which encodes the state once and then uses only the linear update. The forecast restarts from the true state after the chosen forecast length.</p>
-    </div>
-    <div class="card demo reveal">
-      <div class="demo-body">
-        <div class="stage"><canvas id="cv-pred" role="img" aria-label="The true pendulum and the forecast of the learned model"></canvas></div>
-        <div class="side">
-          <div class="controls">
-            <span class="ctl-label">Forecast length</span>
-            <div class="seg" role="group" aria-label="Forecast length">
-              <button data-h="0.5" aria-pressed="false">0.5 s</button><button data-h="1" aria-pressed="true">1 s</button><button data-h="2" aria-pressed="false">2 s</button>
-            </div>
-          </div>
-          <div class="controls">
-            <label><input type="checkbox" id="pred-force" checked> Random torque input</label>
-            <button class="btn line sm" id="pred-reset">New start</button>
-          </div>
-          <canvas class="plot" id="pl-pred" aria-label="Pendulum angle over time: true and predicted"></canvas>
-          <div class="legend"><span><span class="sw" style="border-color:#1d1d1f"></span>true angle</span><span><span class="sw" style="border-color:#0e9f8f"></span>forecast</span><span><span class="sw" style="border-color:#e8590c;border-top-style:dotted"></span>torque</span></div>
-          <div>
-            <div class="legend" style="margin-bottom:6px"><span>The 18 values of the latent state \(z\)</span></div>
-            <canvas class="latent" id="lat" aria-label="Bars that show the 18 values of the latent state"></canvas>
-          </div>
-          <div class="readouts">
-            <div class="ro"><div class="l">Time left</div><div class="n" id="ro-h">–</div></div>
-            <div class="ro"><div class="l">Angle error</div><div class="n" id="ro-e">–</div></div>
-            <div class="ro"><div class="l">Latent size</div><div class="n">18</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <details><summary>Training details</summary><p class="note">We trained this model with our code (<code>scripts/export_page_demo.py</code>) on swings up to ±90° with random torques. We then fit \(A\) and \(B\) again by least squares (EDMD) on new data, which is the setting of our theory. On test swings, the median angle error is <span id="err-stats">1.1° after 0.3 s, 3.1° after 1 s, and 3.5° after 2 s</span>.</p></details>
-  </div>
-</section>
-
-<section id="control" class="dark">
-  <div class="wrap">
-    <div class="text reveal">
-      <p class="kicker">Demo 2</p>
-      <h2>Control</h2>
-      <p class="sub">The same model now controls the pendulum with model predictive control (MPC): at each step it plans 15 steps ahead and applies the first input. Drag the slider to change the target angle, or press Push.</p>
-    </div>
-    <div class="card demo reveal">
-      <div class="demo-body">
-        <div class="stage"><canvas id="cv-ctrl" role="img" aria-label="Pendulum controlled by MPC on the learned linear model"></canvas></div>
-        <div class="side">
-          <div class="controls">
-            <label for="tgt">Target angle</label><input id="tgt" type="range" min="-30" max="30" step="1" value="25"><span id="tgt-v" style="font-weight:700;min-width:44px">25°</span>
-            <button class="btn primary sm" id="push">Push</button>
-          </div>
-          <canvas class="plot" id="pl-ctrl" aria-label="Angle and target angle over time"></canvas>
-          <div class="legend"><span><span class="sw" style="border-color:#f5f5f7"></span>angle</span><span><span class="sw" style="border-color:#34d3c0;border-top-style:dashed"></span>target</span><span><span class="sw" style="border-color:#e8590c"></span>torque (limit ±8)</span></div>
-          <div class="readouts">
-            <div class="ro"><div class="l">Angle</div><div class="n" id="rc-a">–</div></div>
-            <div class="ro"><div class="l">Error</div><div class="n" id="rc-e">–</div></div>
-            <div class="ro"><div class="l">Torque</div><div class="n" id="rc-u">–</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <details><summary>Details</summary><p class="note">To hold the pendulum at an angle, the controller must push against gravity with a constant torque. It finds this torque from the linear model. In our tests from random starts, the final error is below 0.7° for all targets between −30° and +30°.</p></details>
-  </div>
-</section>
-
-<section id="try" class="gray">
-  <div class="wrap">
-    <div class="text reveal">
-      <p class="kicker">Demo 3</p>
-      <h2>Data size and latent size</h2>
-      <p class="sub">We trained 21 pendulum models with 2 to 16,000 trajectories and three latent sizes. With 2 trajectories the smallest model is best; from 20 trajectories on, the largest is best. Pick a cell in the table to watch that model.</p>
-    </div>
-    <div class="card demo reveal">
       <div class="demo-body">
         <div class="stage"><canvas id="cv-try" role="img" aria-label="The true pendulum and the forecast of the chosen model"></canvas></div>
         <div class="side">
@@ -585,25 +486,104 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
       </div>
       <div style="padding:6px 22px 22px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin:14px 6px 2px">
-          <h3 style="margin:0;font-size:20px">Median angle error after 1 s</h3>
-          <span style="font-size:14px;color:var(--ink-3)">★ best latent size for this data size. ⚠ fewer transitions than \(n\ln n\).</span>
+          <h4 style="margin:0">Median angle error after 1 s</h4>
+          <span style="font-size:14px;color:var(--ink-3)">★ lowest measured error for this data size. ⚠ fewer transitions than \(n\log n\).</span>
         </div>
         <div class="scroll-x"><table class="grid-tbl" id="try-grid" aria-label="Measured forecast error for each data size and latent size"></table></div>
+        <p class="note">Each trajectory has 15 time steps.</p>
+        <details><summary>Details</summary><p class="note">Trained with <code>scripts/export_page_demo.py --grid</code> on swings up to ±90°, one training seed per model; \(A\) and \(B\) refitted by least squares on the same training data. Errors are medians over 300 test swings with the demo's random torques; the forecast restarts from the true state every second. ⚠ marks fewer transitions than \(n\log n\), hence also below \(\kappa_n\log n\), since \(\kappa_n\ge n\).</p></details>
       </div>
     </div>
-    <p class="note">Each trajectory has 15 time steps.</p>
-    <details><summary>Training details</summary><p class="note">We trained every model with <code>scripts/export_page_demo.py --grid</code> on swings up to ±90°, with one training seed per model. We then fit \(A\) and \(B\) again by least squares on the same training data, so each model uses only its own data. The errors are medians over 300 test swings with the same random torques as the demo. The forecast starts again from the true state every second. ⚠ marks fewer transitions than \(n\ln n\), hence also below \(\kappa_n\ln n\), since \(\kappa_n\ge n\).</p></details>
   </div>
 </section>
 
-<section id="method">
+<section id="leverage" class="gray">
+  <div class="wrap">
+    <div class="center text reveal" style="max-width:860px">
+      <p class="kicker">04 · Beyond dimension: leverage</p>
+      <h2>Why dimension alone is not enough</h2>
+    </div>
+    <div class="card formula reveal">
+      \[G_n=\mathbb{E}_{\mu}\big[\Phi(s)\Phi(s)^\top\big],\qquad \kappa_n=\sup_s\big\|G_n^{-1/2}\Phi(s)\big\|^2\]
+      <small>After whitening, the average squared feature magnitude is \(n\), but its maximum, the leverage constant \(\kappa_n\), can be much larger. Two observable spaces of the same dimension can therefore have very different sample requirements.</small>
+    </div>
+
+    <div class="card reveal illus" style="margin-top:20px;padding:26px" id="illus">
+      <div class="controls" style="justify-content:space-between">
+        <div><h3 style="margin:0">Two observable spaces with the same dimension</h3>
+          <div style="font-size:15px;color:var(--ink-2)">Both have \(n=7\) features on \(s\in[0,1]\). Narrowing the bump feature concentrates the leverage and raises \(\kappa\); \(n\) stays fixed.</div></div>
+        <span class="tag schem" style="margin:0">Illustration, not data</span>
+      </div>
+      <div class="xctl" style="grid-template-columns:1fr;max-width:420px;margin-top:16px">
+        <div><div class="row"><label for="bump-w">Width of the bump feature (right panel)</label><output id="bump-v" for="bump-w">–</output></div>
+          <input id="bump-w" type="range" min="0" max="1" step="0.01" value="0.6"><div class="ends"><span>broad</span><span>localized</span></div></div>
+      </div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="panel"><h4>Well spread: Fourier features</h4><svg id="illus-a" viewBox="0 0 360 270" role="img" aria-label="Whitened Fourier features and their flat leverage curve"></svg></div>
+        <div class="panel"><h4>Concentrated: one localized bump feature</h4><svg id="illus-b" viewBox="0 0 360 270" role="img" aria-label="Whitened features with one localized bump and their peaked leverage curve"></svg></div>
+      </div>
+      <div class="legend" style="margin-top:8px"><span><span class="sw" style="border-color:#9aa3ad"></span>whitened features \(G^{-1/2}\Phi(s)\)</span><span><span class="sw" style="border-color:#6e56cf;border-top-width:8px;opacity:.5"></span>leverage \(\ell(s)=\Phi(s)^\top G^{-1}\Phi(s)\)</span><span><span class="sw" style="border-color:#1d1d1f;border-top-style:dashed"></span>mean of \(\ell\) \(=n\)</span></div>
+      <p class="note" id="illus-read" aria-live="polite"></p>
+      <p class="caveat">Same dimension \(n\), different leverage \(\kappa_n\): the concentrated space needs more samples under the bound \(m\gtrsim\kappa_n\log n\). Gram matrix by quadrature on \([0,1]\); both panels share the leverage axis.</p>
+    </div>
+
+    <p class="sub reveal" style="font-size:17px;max-width:900px;margin:28px auto 0">In a direct test on the damped pendulum, we freeze learned encoders with \(n=4\) to \(66\) (five seeds) and fit \((A,B)\) by least squares on \(m\) independent transitions. The sampling error decays as \(m^{-0.50}\) to \(m^{-0.52}\), the predicted rate \(m^{-1/2}\); the sampling and projection MSEs sum to the total MSE within 0.3%; and the projection error decreases with \(n\) from \(1.80\times10^{-4}\) to \(1.34\times10^{-4}\). The threshold \(m_{50}\) is the number of transitions at which the event \(\|\tilde G_{n,m}-I\|\le\tfrac12\) holds with probability \(\tfrac12\).</p>
+
+    <div class="card reveal" style="margin-top:20px;padding:26px" id="lev-card">
+      <div class="controls" style="justify-content:space-between">
+        <div><h3 style="margin:0">Sample threshold of each encoder (Fig. 5c)</h3>
+          <div style="font-size:15px;color:var(--ink-2)">Each dot is one frozen encoder. Higher dots need more transitions; darker dots have higher leverage and need more data than their size alone predicts. Hover, tap, or press Tab for values.</div></div>
+        <div class="controls">
+          <label><input type="checkbox" id="lev-fitN" checked> \(N\log N\) fit</label>
+          <label><input type="checkbox" id="lev-fitL" checked> Leverage-law fit</label>
+        </div>
+      </div>
+      <div class="lev-scroll"><div class="lev-wrap">
+        <svg id="lev" viewBox="0 0 760 440" role="group" aria-label="Log-log plot of the threshold m50 versus regressor size N for 29 encoders, coloured by leverage ratio"></svg>
+        <div class="tip" id="lev-tip"></div>
+      </div></div>
+      <p id="lev-status" class="note" style="margin-top:0"></p>
+      <div class="colorbar">
+        <span>\(\hat\kappa_r/N\):</span><span id="lev-lo">–</span><span class="cb" id="lev-cb" style="flex-basis:160px"></span><span id="lev-hi">–</span>
+        <span style="margin-left:14px">● reached &nbsp; △ not reached within 8,000 transitions</span>
+        <span><span class="sw" style="border-color:#3a3a3c"></span>\(N\log N\) fit</span>
+        <span>◇ leverage-law fit (per encoder)</span>
+      </div>
+      <p class="note"><b>Leverage lowers the held-out threshold-prediction error by 30% relative to \(N\log N\)</b> (29 full-rank encoders, leave-one-seed-out).</p>
+      <details>
+        <summary>Threshold-law table (Table 3)</summary>
+        <div class="scroll-x">
+        <table class="t3">
+          <thead><tr><th>Law for \(m_{50}\)</th><th style="text-align:right">AIC</th><th style="text-align:right">Held-out error</th><th class="barcell"><span class="sr" style="position:absolute;left:-9999px">Bar</span></th></tr></thead>
+          <tbody>
+            <tr><td>\(N\)</td><td class="num">59.8</td><td class="num">0.53</td><td class="barcell"><div class="b" style="width:100%"></div></td></tr>
+            <tr><td>\(N\log N\)</td><td class="num">27.1</td><td class="num">0.26</td><td class="barcell"><div class="b" style="width:49%"></div></td></tr>
+            <tr><td>\(N^p\) \((\hat p=1.64)\)</td><td class="num">7.2</td><td class="num">0.22</td><td class="barcell"><div class="b" style="width:41.5%"></div></td></tr>
+            <tr><td>\(\hat\kappa_r\log N\)</td><td class="num">36.9</td><td class="num">0.44</td><td class="barcell"><div class="b" style="width:83%"></div></td></tr>
+            <tr class="best"><td>\(N\log N\,(\hat\kappa_r/N)^\eta\) \((\hat\eta=0.42)\)</td><td class="num">−10.0</td><td class="num">0.18</td><td class="barcell"><div class="b" style="width:34%"></div></td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="note">Lower is better for both columns. AIC rewards fit and penalises parameters; held-out error is the leave-one-seed-out RMS error of \(\log m_{50}\). Deviations from the \(N\log N\) law correlate with \(\log(\hat\kappa_r/N)\) (rank correlation 0.84); the fitted dependence on leverage is sublinear (\(\hat\eta\approx0.4\)).</p>
+      </details>
+      <details>
+        <summary>Figure details and data</summary>
+        <p class="note">\(N=n+1\) is the size of the regressor \([\Phi(x);u]\), and \(\hat\kappa_r\) is its estimated leverage. Fitted laws: \(\log m_{50}=a+\log(N\log N)\) and \(\log m_{50}=a+\log(N\log N)+\eta\log(\hat\kappa_r/N)\), on the 29 full-rank encoders. Tooltip predictions are leave-one-seed-out. Dots with the same \(N\) are offset horizontally by seed. The full-rank encoder that does not reach the event within 8,000 transitions is right-censored.</p>
+        <p class="note" id="lev-excl"></p>
+        <div class="scroll-x"><table class="dtbl" id="lev-table" aria-label="Per-encoder data of Fig. 5c"></table></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="control-sec">
   <div class="wrap">
     <div class="center text reveal" style="max-width:820px">
-      <p class="kicker">Method</p>
-      <h2>Training losses</h2>
-      <p class="sub">Prediction accuracy alone does not fully characterize control utility. We therefore add two auxiliary losses to the prediction loss; +Aux denotes the model trained with both.</p>
+      <p class="kicker">05 · From prediction to control</p>
+      <h2>Representations for control</h2>
+      <p class="sub">Two auxiliary losses complement the prediction loss; +Aux denotes the model trained with both.</p>
     </div>
-    <div class="grid3">
+    <div class="grid3" id="method">
       <div class="card loss reveal"><span class="tag" style="background:#e6f7f4;color:#0b7a6e;align-self:flex-start">Prediction loss</span><h3>Predict 15 steps</h3><p>Roll the linear model forward 15 steps and compare the predicted physical states with the true states.</p>
         <svg viewBox="0 0 320 150" role="img" aria-label="Schematic: a 15-step latent rollout compared with true states">
           <text x="8" y="16" font-size="11" font-weight="700" fill="#86868b" letter-spacing=".08em">SCHEMATIC</text>
@@ -615,7 +595,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
           <text x="306" y="30" font-size="12" fill="#1d1d1f" text-anchor="end">true</text>
           <text x="306" y="80" font-size="12" fill="#0e9f8f" text-anchor="end">predicted</text>
         </svg></div>
-      <div class="card loss reveal"><span class="tag" style="background:#eef2ff;color:#4338ca;align-self:flex-start">Covariance loss</span><h3>Decorrelate the features</h3><p>Penalise the off-diagonal covariance of the learned features, which lowers the condition number of the features.</p>
+      <div class="card loss reveal"><span class="tag" style="background:#eef2ff;color:#4338ca;align-self:flex-start">Covariance loss</span><h3>Decorrelate the features</h3><p>Penalise the off-diagonal covariance of the learned features, which encourages better feature conditioning.</p>
         <svg viewBox="0 0 320 150" role="img" aria-label="Animated schematic: during training, the off-diagonal entries of the feature covariance matrix shrink while the diagonal stays">
           <text x="8" y="16" font-size="11" font-weight="700" fill="#86868b" letter-spacing=".08em">SCHEMATIC</text>
           <g id="cov-mat" transform="translate(20,26)"></g>
@@ -647,24 +627,15 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
           <circle id="inv-t1" r="5" fill="#0e9f8f" opacity="0"/><circle id="inv-t2" r="5" fill="#e8590c" opacity="0"/><circle id="inv-t3" r="5" fill="#c2410c" opacity="0"/>
         </svg></div>
     </div>
-    <div class="controls" style="justify-content:center;margin-top:18px"><button type="button" class="btn line sm anim-toggle">Pause animations</button></div>
+    <div class="controls" style="justify-content:center;margin-top:14px"><button type="button" class="btn line sm anim-toggle">Pause animations</button></div>
     <div class="insight reveal">
       <h3>Similar prediction accuracy does not imply similar control performance.</h3>
-      <p>An unstructured neural dynamics model (NNDM, an MLP) predicts best on G1 and Go2 but performs poorly with random-shooting MPC. With linear latent dynamics, MPC reduces to a quadratic problem solved in closed form, so a reliable controller is cheap.</p>
+      <p>An unstructured neural dynamics model (NNDM) predicts best on G1 and Go2 but performs poorly with random-shooting MPC. Linear latent dynamics enable efficient quadratic optimization for control.</p>
     </div>
-  </div>
-</section>
 
-<section id="results" class="gray">
-  <div class="wrap">
-    <div class="center text reveal" style="max-width:820px">
-      <p class="kicker">Experiments</p>
-      <h2>From pendulums to humanoid robots</h2>
-      <p class="sub">Six systems: a damped pendulum, a double pendulum, a Franka Panda arm, a Kinova Gen3 arm, a Unitree Go2 quadruped, and a Unitree G1 humanoid. All are simulated except the Kinova arm, which uses real-robot data. Each training sample is a trajectory segment of 15 transitions, with up to 140,000 samples.</p>
-    </div>
-    <h3 class="center reveal" style="text-align:center;margin-top:52px">Robotic control gallery</h3>
-    <p class="note center" style="text-align:center;margin-top:0"><b>Survival steps</b> (G1, Go2): steps until the mean joint-position tracking error exceeds a failure threshold, averaged over 1,000 test reference trajectories; higher is better. <b>Tracking error</b> (Franka): figure-8 end-effector tracking error; lower is better. All at \(m=140\)k, five seeds. Baseline: the Koopman model trained with the prediction loss only.</p>
-    <div class="grid2" style="margin-top:20px">
+    <h3 class="center reveal" id="results" style="text-align:center;margin-top:44px">Robotic control gallery</h3>
+    <p class="note center" style="text-align:center;margin-top:0"><b>Survival steps</b> (G1, Go2): steps until the mean joint-position tracking error exceeds a failure threshold, averaged over 1,000 test reference trajectories; higher is better. <b>Tracking error</b> (Franka): figure-8 end-effector error; lower is better. All at \(m=140\)k, five seeds. Baseline: the Koopman model trained with the prediction loss only.</p>
+    <div class="grid2" style="margin-top:16px">
       <div class="card reveal">
         <div class="gal-media"><div class="gal-crop" style="background-position:100% 0" role="img" aria-label="Humanoid robot, crop of the paper's system figure"></div></div>
         <div class="res" style="padding-top:18px"><span class="tag sim">Simulation</span><h3>Unitree G1 humanoid</h3><div class="num">+6%</div><p>mean tracking survival</p>
@@ -695,50 +666,51 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
         <p class="stat">With weights selected on validation data, the inverse-control loss improves input recoverability by a factor of 3.7 to 8, and the combined regularizers reduce the prediction loss by 15% at \(m=4\)k and 7% at \(m=140\)k.</p></div></div>
     </div>
     <p class="note">G1 and Go2: paired \(t\)-test, \(p=0.003\). Bars show mean ± standard deviation over seeds. Robot images are crops of the paper's system figure.</p>
-    <div class="limits reveal">
-      <h3>Limitations</h3>
-      <ul>
-        <li>The guarantees assume independent samples and a feature space that is fixed, or learned on separate data.</li>
-        <li>The theory gives a sufficient sample-size scale, not an exact law. The coefficient 40 in the data schedule below is an empirical guideline.</li>
-        <li>The G1, Go2, and Franka results are from simulation; the Kinova results use real-robot data.</li>
-      </ul>
-    </div>
   </div>
 </section>
 
-<section id="tools">
+<section id="resources" class="gray">
   <div class="wrap">
     <div class="center text reveal" style="max-width:820px">
-      <p class="kicker">Tool</p>
-      <h2>Training budget estimator</h2>
-      <p class="sub">On G1 and Go2, about \(40\,n_{\text{enc}}\ln n_{\text{enc}}\) training samples, where \(n_{\text{enc}}\) is the number of learned features, gave nearly full-data accuracy. The estimator applies this schedule to a given state dimension.</p>
+      <p class="kicker">06 · Resources</p>
+      <h2>Training budget, limitations, code</h2>
     </div>
-    <figure class="card reveal" style="margin-top:40px">
-      <div class="fig"><img src="assets/fig_mlogn.png" alt="Prediction error versus latent dimension for the G1 humanoid and the Go2 quadruped when the training data grows as m = c n_enc ln n_enc, for coefficients c from 1 to 40, compared with the full training set" style="width:100%" loading="lazy"></div>
-      <figcaption><b>G1 and Go2.</b> Prediction error under the schedule \(m=c\,n_{\text{enc}}\ln n_{\text{enc}}\); brown: full training set. Increasing \(c\) from 1 to 40 moves the curves toward the full-data result.</figcaption>
-    </figure>
-    <div class="card est reveal" style="margin-top:20px">
+    <div class="card est reveal" id="tools" style="margin-top:24px">
+      <h3 style="margin:0 0 4px">Training budget estimator</h3>
+      <p class="eqline" style="margin:0 0 16px">Schedule \(m=c\,n_{\text{enc}}\log n_{\text{enc}}\), where \(n_{\text{enc}}\) is the number of learned features. On G1 and Go2, increasing \(c\) from 1 to 40 moves the error toward the full-data baseline.</p>
       <div class="inputs">
         <div><label class="ctl-label" for="e-nx" style="display:block;margin-bottom:6px">Physical state dimension \(n_x\)</label><input id="e-nx" type="number" min="1" max="10000" step="1" value="10"></div>
         <div><div class="ctl-label" style="margin-bottom:6px" id="e-mult-l">Feature multiplier \(n_{\text{enc}}/n_x\)</div>
           <div class="seg" id="e-mult" role="group" aria-labelledby="e-mult-l"><button type="button" data-k="1" aria-pressed="false">1</button><button type="button" data-k="2" aria-pressed="false">2</button><button type="button" data-k="4" aria-pressed="true">4</button><button type="button" data-k="8" aria-pressed="false">8</button><button type="button" data-k="16" aria-pressed="false">16</button></div></div>
         <div><label class="ctl-label" for="e-c" style="display:block;margin-bottom:6px">Coefficient \(c\)</label><input id="e-c" type="number" min="0" max="10000" step="1" value="40"></div>
       </div>
-      <div class="readouts math" style="margin-top:20px" aria-live="polite">
+      <div class="readouts math" style="margin-top:18px" aria-live="polite">
         <div class="ro"><div class="l">Learned features \(n_{\text{enc}}\)</div><div class="n" id="e-nenc">–</div></div>
         <div class="ro"><div class="l">Latent size \(n\)</div><div class="n" id="e-n">–</div></div>
         <div class="ro"><div class="l">Training samples \(m\)</div><div class="n" id="e-m">–</div></div>
       </div>
       <p class="eqline" id="e-eq"></p>
       <p class="caveat">Based on the empirical schedule tested on G1 and Go2. The coefficient 40 is an experimental guideline, not a universal requirement or theoretical guarantee.</p>
+      <details><summary>G1 and Go2 schedule figure</summary>
+        <figure style="margin-top:10px"><img src="assets/fig_mlogn.png" alt="Prediction error versus latent dimension for the G1 humanoid and the Go2 quadruped when the training data grows as m = c n_enc log n_enc, for coefficients c from 1 to 40, compared with the full training set" style="width:100%;border-radius:10px" loading="lazy">
+          <figcaption style="padding:8px 0 0">Prediction error under \(m=c\,n_{\text{enc}}\log n_{\text{enc}}\); brown: full training set.</figcaption></figure>
+      </details>
     </div>
-  </div>
-</section>
-
-<section id="citation" class="gray">
-  <div class="wrap">
-    <div class="center text reveal"><h2>BibTeX</h2></div>
-    <div class="codebox reveal" style="max-width:820px;margin:28px auto 0">
+    <div class="grid2" style="margin-top:20px">
+      <div class="limits reveal" style="margin-top:0">
+        <h3>Limitations</h3>
+        <ul>
+          <li>The guarantees assume independent samples and a feature space that is fixed, or learned on separate data.</li>
+          <li>The theory gives a sufficient sample-size scale, not an exact law; the coefficient 40 is an empirical guideline.</li>
+          <li>The G1, Go2, and Franka results are from simulation; the Kinova results use real-robot data.</li>
+        </ul>
+      </div>
+      <div class="card feature reveal">
+        <h3>Code</h3>
+        <p>Training, MPC, and the fixed-feature study: <a href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener">github.com/intelligent-control-lab/Koopman-Scaling</a>.</p>
+      </div>
+    </div>
+    <div class="codebox reveal" id="citation" style="max-width:none;margin:20px auto 0">
       <button class="copy" type="button" data-target="bibtex">Copy</button>
 <pre id="bibtex">@article{abuduweili2026scaling,
   title   = {Scaling Law of Neural {Koopman} Operators},
@@ -802,10 +774,27 @@ if ('IntersectionObserver' in window && !reduce && !(window.matchMedia && window
 window.addEventListener('beforeprint', () => {
   revealEls.forEach(e => e.classList.add('in'));
   Array.from(pendingNear).forEach(f => f());
+  document.querySelectorAll('[role=tabpanel][hidden]').forEach(pn => { pn.hidden = false; pn.setAttribute('data-print-hidden', ''); });
   printHooks.forEach(f => { try { f(); } catch (err) { /* a figure that is not ready stays blank */ } });
   document.querySelectorAll('details').forEach(d => { if (!d.open) { d.open = true; d.setAttribute('data-print-open', ''); } });
 });
-window.addEventListener('afterprint', () => document.querySelectorAll('details[data-print-open]').forEach(d => { d.open = false; d.removeAttribute('data-print-open'); }));
+window.addEventListener('afterprint', () => {
+  document.querySelectorAll('details[data-print-open]').forEach(d => { d.open = false; d.removeAttribute('data-print-open'); });
+  document.querySelectorAll('[data-print-hidden]').forEach(pn => { pn.hidden = true; pn.removeAttribute('data-print-hidden'); });
+});
+
+/* demo tabs (Prediction | Control): only the visible panel is simulated and drawn */
+(function tabs() {
+  const tabsEl = Array.from(document.querySelectorAll('.tabs [role=tab]'));
+  function select(t) {
+    tabsEl.forEach(x => { const on = x === t; x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; $(x.getAttribute('aria-controls')).hidden = !on; });
+    window.dispatchEvent(new Event('resize'));          /* redraw the newly shown canvases at their real size */
+  }
+  tabsEl.forEach((t, i) => {
+    t.addEventListener('click', () => select(t));
+    t.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const n = tabsEl[(i + (e.key === 'ArrowRight' ? 1 : tabsEl.length - 1)) % tabsEl.length]; select(n); n.focus(); } });
+  });
+})();
 document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', () => navigator.clipboard.writeText($(b.dataset.target).innerText).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1500); })));
 
 /* canvas helper: CSS pixels x devicePixelRatio */
@@ -926,7 +915,7 @@ function drawHeat() {
   c.font = '600 13px -apple-system, system-ui, sans-serif';
   const pl = pts[Math.round(pts.length * 0.86)]; c.fillStyle = '#fff'; c.textAlign = 'left';
   c.fillText('n*(m)', pl[0] - 20, Math.max(T + 16, Math.min(T + ph - 6, pl[1] - 12)));
-  c.fillStyle = '#ffb3b3'; supText(c, X(3.12), Y(12.2), [['m < n', 0], ['p', 1], [' ln n', 0]]);
+  c.fillStyle = '#ffb3b3'; supText(c, X(3.12), Y(12.2), [['m < n', 0], ['p', 1], [' log n', 0]]);
   c.fillStyle = '#6e6e73'; c.font = '13px -apple-system, system-ui, sans-serif'; c.textAlign = 'center';
   for (let lm = 3; lm <= 7; lm++) c.fillText(fmt(Math.pow(10, lm)), X(lm), H - B + 20);
   c.fillText('training data m', L + pw / 2, H - 8);
@@ -940,7 +929,7 @@ function heatTip(e) {
   if (!geo) return; const r = heat.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
   const { L, T, pw, ph } = geo, { beta, p } = st(); if (x < L || x > L + pw || y < T || y > T + ph) { tip.style.opacity = 0; return; }
   const m = Math.pow(10, LM[0] + (x - L) / pw * (LM[1] - LM[0])), n = Math.pow(2, LN[1] - (y - T) / ph * (LN[1] - LN[0]));
-  tip.innerHTML = `m = ${fmt(m)} · n = ${fmt(n)}<br>surrogate ${bound(n, m, beta, p).toFixed(3)} · optimal n ≈ ${fmt(nStar(m, beta, p))}${need(n, p) > m ? '<br><span style="color:#ff9b9b">m &lt; n<sup>p</sup> ln n</span>' : ''}`;
+  tip.innerHTML = `m = ${fmt(m)} · n = ${fmt(n)}<br>surrogate ${bound(n, m, beta, p).toFixed(3)} · surrogate-optimal n ≈ ${fmt(nStar(m, beta, p))}${need(n, p) > m ? '<br><span style="color:#ff9b9b">m &lt; n<sup>p</sup> log n</span>' : ''}`;
   tip.style.left = Math.min(x, r.width - 200) + 'px'; tip.style.top = y + 'px'; tip.style.opacity = 1;
 }
 heat.addEventListener('pointermove', heatTip);
@@ -958,7 +947,7 @@ const thr = el('rect', { y: Y1, height: Y0 - Y1, fill: '#d70015', 'fill-opacity'
 const thrL = el('text', { y: Y1 + 20, 'font-size': 13, 'font-weight': 600, fill: '#d70015', 'text-anchor': 'end' }, svg);
 el('tspan', {}, thrL).textContent = 'm < n';
 el('tspan', { 'baseline-shift': 'super', 'font-size': 10 }, thrL).textContent = 'p';
-el('tspan', { 'baseline-shift': 'baseline' }, thrL).textContent = ' ln n';
+el('tspan', { 'baseline-shift': 'baseline' }, thrL).textContent = ' log n';
 const pS = el('path', { fill: 'none', stroke: '#e8590c', 'stroke-width': 2.5, 'stroke-dasharray': '7 6' }, svg);
 const pP = el('path', { fill: 'none', stroke: '#6e56cf', 'stroke-width': 2.5, 'stroke-dasharray': '2 5' }, svg);
 const pT = el('path', { fill: 'none', stroke: '#0e9f8f', 'stroke-width': 3.5 }, svg);
@@ -972,7 +961,7 @@ function drawEx() {
   pS.setAttribute('d', pth(n => Math.sqrt(need(n, p) / m))); pP.setAttribute('d', pth(n => Math.pow(n, -beta))); pT.setAttribute('d', pth(n => bound(n, m, beta, p)));
   const ns = nStar(m, beta, p), x = lx(ns), y = ly(bound(ns, m, beta, p));
   vL.setAttribute('x1', x); vL.setAttribute('x2', x); dot.setAttribute('cx', x); dot.setAttribute('cy', y);
-  lab.setAttribute('x', Math.min(x + 12, X1 - 110)); lab.setAttribute('y', Math.max(Y1 + 40, y - 12)); lab.textContent = 'optimal n ≈ ' + fmt(ns);
+  lab.setAttribute('x', Math.min(x + 12, X1 - 110)); lab.setAttribute('y', Math.max(Y1 + 40, y - 12)); lab.textContent = 'n* ≈ ' + fmt(ns);
   const nt = nCond(m, p);
   thr.setAttribute('x', lx(nt)); thr.setAttribute('width', Math.max(0, X1 - lx(nt))); thrL.setAttribute('x', X1 - 10);
   thrL.style.display = nt < NMAX ? '' : 'none';
@@ -1024,12 +1013,12 @@ function buildLev(D) {
   const gN = el('g', { 'pointer-events': 'none' }, s);
   let d = ''; for (let i = 0; i <= 120; i++) { const v = 4.5 * Math.pow(80 / 4.5, i / 120); d += (i ? 'L' : 'M') + xs(v).toFixed(1) + ' ' + ys(Math.exp(aN) * v * Math.log(v)).toFixed(1); }
   el('path', { d, fill: 'none', stroke: '#3a3a3c', 'stroke-width': 2 }, gN);
-  el('text', { x: xs(80) - 4, y: ys(Math.exp(aN) * 80 * Math.log(80)) + 18, 'text-anchor': 'end', 'font-size': 12, fill: '#3a3a3c' }, gN).textContent = 'N ln N fit';
+  el('text', { x: xs(80) - 4, y: ys(Math.exp(aN) * 80 * Math.log(80)) + 18, 'text-anchor': 'end', 'font-size': 12, fill: '#3a3a3c' }, gN).textContent = 'N log N fit';
   const gP = el('g', {}, s), gL = el('g', { 'pointer-events': 'none' }, s);
   const levTip = $('lev-tip'), wrap = s.parentNode;
-  const lbl = e => `n ${e.n}, N ${e.N}, seed ${e.seed}, leverage ${r0(e.kappa, 1)}, leverage over N ${r0(ratio(e), 1)}, observed m50 ${e.m50 == null ? 'not reached within ' + r0(D.m_max) : r0(e.m50)}, predicted by N ln N ${r0(e.pred_nlogn)}, predicted by leverage law ${r0(e.pred_leverage)}, status ${e.status}`;
+  const lbl = e => `n ${e.n}, N ${e.N}, seed ${e.seed}, leverage ${r0(e.kappa, 1)}, leverage over N ${r0(ratio(e), 1)}, observed m50 ${e.m50 == null ? 'not reached within ' + r0(D.m_max) : r0(e.m50)}, predicted by N log N ${r0(e.pred_nlogn)}, predicted by leverage law ${r0(e.pred_leverage)}, status ${e.status}`;
   function show(e, x, y) {
-    levTip.innerHTML = `<b>n = ${e.n} (N = ${e.N}) · seed ${e.seed}</b><br>κ̂<sub>r</sub> = ${r0(e.kappa, 1)} · κ̂<sub>r</sub>/N = ${r0(ratio(e), 1)}<br>observed m<sub>50</sub>: ${e.m50 == null ? 'not reached within ' + r0(D.m_max) : r0(e.m50)}<br>predicted, N ln N law: ${r0(e.pred_nlogn)}<br>predicted, leverage law: ${r0(e.pred_leverage)}<br>status: ${e.status}<small>Predictions are leave-one-seed-out.</small>`;
+    levTip.innerHTML = `<b>n = ${e.n} (N = ${e.N}) · seed ${e.seed}</b><br>κ̂<sub>r</sub> = ${r0(e.kappa, 1)} · κ̂<sub>r</sub>/N = ${r0(ratio(e), 1)}<br>observed m<sub>50</sub>: ${e.m50 == null ? 'not reached within ' + r0(D.m_max) : r0(e.m50)}<br>predicted, N log N law: ${r0(e.pred_nlogn)}<br>predicted, leverage law: ${r0(e.pred_leverage)}<br>status: ${e.status}<small>Predictions are leave-one-seed-out.</small>`;
     const k = wrap.getBoundingClientRect().width / W, px = x * k, py = y * k;
     levTip.style.top = py + 'px';
     if (px > wrap.getBoundingClientRect().width - 260) { levTip.style.left = (px - 24) + 'px'; levTip.style.transform = 'translate(-100%,-50%)'; }
@@ -1056,7 +1045,7 @@ function buildLev(D) {
   $('lev-lo').textContent = r0(Math.exp(rlo), 1); $('lev-hi').textContent = r0(Math.exp(rhi), 1);
   $('lev-cb').style.background = `linear-gradient(90deg,${rampCol(0)},${rampCol(.5)},${rampCol(1)})`;
   $('lev-excl').innerHTML = bad.length ? 'Not plotted: ' + bad.map(e => `the encoder with n = ${e.n} (N = ${e.N}), seed ${e.seed}`).join('; ') + '. It is rank-deficient (λ<sub>min</sub>/λ<sub>max</sub> ≈ 2×10<sup>−16</sup>), so its leverage is not defined, and it is excluded from all fits.' : '';
-  let h = '<thead><tr><th>n</th><th>N</th><th>seed</th><th>κ̂<sub>r</sub></th><th>κ̂<sub>r</sub>/N</th><th>observed m<sub>50</sub></th><th>pred. N ln N</th><th>pred. leverage</th><th>status</th></tr></thead><tbody>';
+  let h = '<thead><tr><th>n</th><th>N</th><th>seed</th><th>κ̂<sub>r</sub></th><th>κ̂<sub>r</sub>/N</th><th>observed m<sub>50</sub></th><th>pred. N log N</th><th>pred. leverage</th><th>status</th></tr></thead><tbody>';
   E.slice().sort((a, b) => a.n - b.n || a.seed - b.seed).forEach(e => { h += `<tr><td>${e.n}</td><td>${e.N}</td><td>${e.seed}</td><td>${r0(e.kappa, 1)}</td><td>${e.kappa == null ? '–' : r0(ratio(e), 1)}</td><td>${e.m50 == null ? (e.status === 'not reached' ? '> ' + r0(D.m_max) : '–') : r0(e.m50, 1)}</td><td>${r0(e.pred_nlogn, 1)}</td><td>${r0(e.pred_leverage, 1)}</td><td>${e.status}</td></tr>`; });
   $('lev-table').innerHTML = h + '</tbody>';
 }
@@ -1122,7 +1111,7 @@ document.querySelectorAll('svg.mini[data-base]').forEach(s => {
     const nx = Math.max(1, Math.round(+$('e-nx').value || 1)), c = Math.max(0, +$('e-c').value || 0);
     const nenc = mult * nx, n = nx + nenc, m = Math.round(c * nenc * Math.log(nenc));
     $('e-nenc').textContent = nenc.toLocaleString('en-US'); $('e-n').textContent = n.toLocaleString('en-US'); $('e-m').textContent = m.toLocaleString('en-US');
-    $('e-eq').innerHTML = `m = ${c} · ${nenc} · ln ${nenc} = ${m.toLocaleString('en-US')} training samples` + (nenc === 1 ? ' (ln 1 = 0, so the schedule gives no samples for a single feature)' : '') + '.';
+    $('e-eq').innerHTML = `m = ${c} · ${nenc} · log ${nenc} = ${m.toLocaleString('en-US')} training samples` + (nenc === 1 ? ' (log 1 = 0, so the schedule gives no samples for a single feature)' : '') + '.';
   }
   btns.forEach(b => b.addEventListener('click', () => { mult = +b.dataset.k; btns.forEach(x => x.setAttribute('aria-pressed', String(x === b))); upd(); }));
   $('e-nx').addEventListener('input', upd); $('e-c').addEventListener('input', upd);
@@ -1196,7 +1185,7 @@ function jacobiEig(Ain, n) {
     const ymax = Math.max(A.kappa, B.kappa) * 1.12;
     draw($('illus-a'), A, ymax, -1); draw($('illus-b'), B, ymax, n - 1);
     $('illus-read').textContent = `n = ${n} in both panels. Left: κ = ${A.kappa.toFixed(1)} (κ/n = ${(A.kappa / n).toFixed(2)}). Right: κ = ${B.kappa.toFixed(1)} (κ/n = ${(B.kappa / n).toFixed(2)}). ` +
-      `With unit constants, the data scale κ ln n is ${Math.round(A.kappa * Math.log(n))} on the left and ${Math.round(B.kappa * Math.log(n))} on the right. Mean leverage: ${A.mean.toFixed(2)} and ${B.mean.toFixed(2)}.`;
+      `With unit constants, the data scale κ log n is ${Math.round(A.kappa * Math.log(n))} on the left and ${Math.round(B.kappa * Math.log(n))} on the right. Mean leverage: ${A.mean.toFixed(2)} and ${B.mean.toFixed(2)}.`;
   }
   $('bump-w').addEventListener('input', upd);
   const init = whenNear($('illus'), upd, '300px');
@@ -1364,7 +1353,7 @@ whenNear($('try'), () => fetch('assets/grid_models.json').then(r => r.json()).th
       const row = NS.map(nn => get(m, nn)); const best = Math.min(...row.map(r => r.err['1.0s'][0]));
       h += `<tr><th class="rowh">${mLabel(m)}</th>` + row.map(r => {
         const v = r.err['1.0s'][0], c = shade(v), dark = (c[0] * .3 + c[1] * .59 + c[2] * .11) < 150;
-        return `<td data-m="${r.m}" data-n="${r.nn}" tabindex="0" class="${r.m === S.m && r.nn === S.nn ? 'sel' : ''}" title="${15 * r.m} transitions; n ln n = ${Math.round(r.nn * Math.log(r.nn))}" style="background:rgb(${c.join(',')});color:${dark ? '#fff' : '#1d1d1f'}">${below(r) ? '⚠ ' : ''}${show(v)}${v === best ? '<span class="best">★</span>' : ''}</td>`;
+        return `<td data-m="${r.m}" data-n="${r.nn}" tabindex="0" class="${r.m === S.m && r.nn === S.nn ? 'sel' : ''}" title="${15 * r.m} transitions; n log n = ${Math.round(r.nn * Math.log(r.nn))}" style="background:rgb(${c.join(',')});color:${dark ? '#fff' : '#1d1d1f'}">${below(r) ? '⚠ ' : ''}${show(v)}${v === best ? '<span class="best">★</span>' : ''}</td>`;
       }).join('') + '</tr>';
     }
     tbl.innerHTML = h;
@@ -1404,7 +1393,7 @@ whenNear($('try'), () => fetch('assets/grid_models.json').then(r => r.json()).th
     c.fillStyle = '#1d1d1f'; c.beginPath(); c.arc(cx, cy, 5, 0, 6.3); c.fill();
     c.fillStyle = '#1d1d1f'; c.font = '700 15px -apple-system, system-ui, sans-serif'; c.textAlign = 'left';
     c.fillText(`${mLabel(S.m)} trajectories · n = ${S.nn}`, 16, 28);
-    if (below(get(S.m, S.nn))) { c.fillStyle = '#d70015'; c.fillText('⚠ Fewer transitions than n ln n: below the sufficient scale', 16, H - 16); }
+    if (below(get(S.m, S.nn))) { c.fillStyle = '#d70015'; c.fillText('⚠ Fewer transitions than n log n: below the sufficient scale', 16, H - 16); }
     c.fillStyle = '#86868b'; c.font = '600 13px -apple-system, system-ui, sans-serif';
     c.fillText(`New forecast every 1 s (${Math.max(0, 1 - (S.t - S.t0)).toFixed(1)} s left)`, 16, 48);
     const series = [{ data: S.trueS, color: '#1d1d1f', width: 2.2 }];
