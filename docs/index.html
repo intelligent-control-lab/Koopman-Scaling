@@ -73,7 +73,8 @@ i.v{font-family:var(--math);font-style:italic}
 .btn svg{width:17px;height:17px;fill:currentColor}
 @media (prefers-reduced-motion:reduce){.btn,.btn:hover{transition:none;transform:none}}
 
-.hero{position:relative;min-height:80vh;display:flex;align-items:center;overflow:hidden;background:radial-gradient(1200px 700px at 70% 30%,#12304a 0%,var(--night) 60%);color:#f5f5f7}
+.tabstack{display:grid}.tabstack>[role=tabpanel]{grid-area:1/1;min-width:0}.tabstack>[role=tabpanel][hidden]{display:block;visibility:hidden;pointer-events:none}
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;align-items:center;overflow:hidden;background:radial-gradient(1200px 700px at 70% 30%,#12304a 0%,var(--night) 60%);color:#f5f5f7}
 #phase{position:absolute;inset:0;width:100%;height:100%;opacity:.5}
 .hero .inner{position:relative;z-index:2;padding:108px 24px 40px;text-align:center}
 .hero h1{font-size:clamp(34px,5.2vw,66px);line-height:1.04;letter-spacing:-.035em;font-weight:700;margin:0 auto 16px;max-width:980px}
@@ -229,9 +230,6 @@ figure{margin:0}
 figcaption{font-size:14px;color:var(--ink-2);padding:0 22px 22px;max-width:900px}
 figcaption b{color:var(--ink)}
 
-.limits{margin-top:40px;padding:24px 28px;border-radius:var(--r);background:#fff7ed;border:1px solid #fed7aa}
-.limits h3{font-size:18px;margin-bottom:6px}
-.limits ul{margin:0;padding-left:20px;font-size:15px;color:#7c2d12}
 .limits li{margin:4px 0}
 
 .tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:980px;margin-bottom:14px}
@@ -308,7 +306,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
   <div class="wrap">
     <a class="brand" href="#top">Koopman Scaling Law</a>
     <nav aria-label="Sections">
-      <a href="#overview">Overview</a><a href="#dynamics">Linear dynamics</a><a href="#law">Scaling law</a><a href="#leverage">Leverage</a><a href="#control-sec">Control</a><a href="#resources">Resources</a><a href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener">Code</a>
+      <a href="#overview">Overview</a><a href="#dynamics">Linear dynamics</a><a href="#law">Scaling law</a><a href="#leverage">Leverage</a><a href="#control-sec">Control</a><a href="#resources">Resources</a><a href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener">Code</a><a href="https://arxiv.org/abs/2602.19943" rel="noopener">Paper</a>
     </nav>
   </div>
 </header>
@@ -365,6 +363,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
         <button type="button" role="tab" id="tab-control" aria-controls="control" aria-selected="false" tabindex="-1">Control</button>
         <span class="tabs-note">A learned pendulum model running in your browser.</span>
       </div>
+      <div class="tabstack">
       <div id="predict" role="tabpanel" aria-labelledby="tab-predict">
         <div class="demo-body">
           <div class="stage"><canvas id="cv-pred" role="img" aria-label="The true pendulum and the forecast of the learned model"></canvas></div>
@@ -412,6 +411,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -677,7 +677,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
   <div class="wrap">
     <div class="center text reveal" style="max-width:820px">
       <p class="kicker">06 · Resources</p>
-      <h2>Training budget, limitations, code</h2>
+      <h2>Training budget and code</h2>
     </div>
     <div class="card est reveal" id="tools" style="margin-top:24px">
       <h3 style="margin:0 0 4px">Training budget estimator</h3>
@@ -696,15 +696,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
       <p class="eqline" id="e-eq"></p>
       <p class="caveat">Based on the empirical schedule tested on G1 and Go2. The coefficient 40 is an experimental guideline, not a universal requirement or theoretical guarantee.</p>
     </div>
-    <div class="grid2" style="margin-top:20px">
-      <div class="limits reveal" style="margin-top:0">
-        <h3>Limitations</h3>
-        <ul>
-          <li>The guarantees assume independent samples and a feature space that is fixed, or learned on separate data.</li>
-          <li>The theory gives a sufficient sample-size scale, not an exact law; the coefficient 40 is an empirical guideline.</li>
-          <li>The G1, Go2, and Franka results are from simulation; the Kinova results use real-robot data.</li>
-        </ul>
-      </div>
+    <div style="margin-top:20px">
       <div class="card feature reveal">
         <h3>Code</h3>
         <p>Training, MPC, and the fixed-feature study: <a href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener">github.com/intelligent-control-lab/Koopman-Scaling</a>.</p>
