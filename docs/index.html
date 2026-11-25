@@ -17,9 +17,9 @@
 <meta name="twitter:image" content="https://intelligent-control-lab.github.io/Koopman-Scaling/assets/fig_robots.png">
 <link rel="canonical" href="https://intelligent-control-lab.github.io/Koopman-Scaling/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%230b1220%27/%3E%3Cpath d=%27M12 50 Q26 18 52 14%27 fill=%27none%27 stroke=%27%2334d3c0%27 stroke-width=%277%27 stroke-linecap=%27round%27/%3E%3Ccircle cx=%2732%27 cy=%2726%27 r=%276%27 fill=%27%23fff%27/%3E%3C/svg%3E">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/contrib/auto-render.min.js"></script>
 <script>
 /* typeset \( \) and \[ \] with KaTeX once the deferred scripts have loaded; without them the TeX source stays readable */
 document.addEventListener('DOMContentLoaded', function () {
@@ -52,7 +52,6 @@ code{font:14px var(--mono)}
 i.v{font-family:var(--math);font-style:italic}
 .eq{font-family:var(--math);white-space:nowrap}
 .eq sub,.eq sup,i.v sub,i.v sup{font-size:.7em}
-.rad{display:inline-block;transform:scaleY(1.3);margin-right:-2px}
 
 .bar{position:fixed;inset:0 0 auto 0;z-index:30;height:64px;background:rgba(11,18,32,.72);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid rgba(255,255,255,.08);transition:background .3s}
 .bar.light{background:rgba(255,255,255,.78);border-bottom-color:rgba(0,0,0,.08)}
@@ -80,8 +79,8 @@ i.v{font-family:var(--math);font-style:italic}
 .hero h1{font-size:clamp(34px,5.2vw,66px);line-height:1.04;letter-spacing:-.035em;font-weight:700;margin:0 auto 16px;max-width:980px}
 .hero h1 .grad{background:linear-gradient(90deg,#7ef0e2,#34d3c0 40%,#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero .q{font-size:clamp(19px,2.2vw,25px);line-height:1.4;color:#fff;max-width:780px;margin:0 auto 26px;font-weight:500}
-.hero .bound{font-size:clamp(22px,3.3vw,40px);line-height:1.3;color:#fff;margin:0 auto 4px;max-width:100%;overflow-x:auto;overflow-y:hidden}
-.hero .bound .katex-display{margin:.15em 0}
+.hero .bound{font-size:clamp(20px,2.8vw,34px);line-height:1.3;color:#fff;margin:0 auto 4px;max-width:100%;overflow-x:auto;overflow-y:hidden}
+.hero .bound .katex-display{margin:.15em 0;padding:.25em 0}
 .hero .bound-cap{font-size:16px;color:#e8eaef;margin:0 auto 28px;max-width:680px}
 .hero .authors{font-size:17px;color:#f5f5f7;margin-bottom:4px;font-weight:600}
 .hero .affil{font-size:15px;color:#e8eaef;margin-bottom:24px}
@@ -146,11 +145,8 @@ input[type=range]{accent-color:var(--teal);width:170px}
 .note{font-size:15px;line-height:1.6;color:var(--ink-3);margin-top:14px;max-width:900px}
 section.dark .note{color:rgba(245,245,247,.5)}
 
-.formula{margin:46px auto 0;padding:34px 28px;text-align:center;font-size:clamp(24px,3.4vw,40px);max-width:900px}
+.formula{margin:46px auto 0;padding:30px 28px;text-align:center;font-size:clamp(17px,2.3vw,26px);max-width:900px;overflow:visible}
 .formula small{display:block;margin-top:14px;font-family:var(--font);font-size:15px;color:var(--ink-2);line-height:1.55}
-.frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;font-size:.8em;margin:0 3px}
-.frac>span:first-child{border-bottom:2px solid currentColor;padding:0 6px}
-.sqrt{border-top:2px solid currentColor;padding:2px 2px 0;margin-left:2px}
 .t-samp{color:var(--orange)} .t-proj{color:var(--violet)}
 
 /* scaling-law explorer */
@@ -261,7 +257,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
 @media (max-width:900px){.xplots{grid-template-columns:1fr}}
 .xplots h4{margin:0 0 2px;font-size:17px;letter-spacing:-.01em}
 .xplots .hint{font-size:14px;color:var(--ink-2)}
-.formula .katex-display{margin:.2em 0}
+.formula .katex-display{margin:.2em 0;overflow-x:auto;overflow-y:hidden;padding:.25em 0}
 .big .katex{font-size:1em}
 @media print{
   html.js-reveal .reveal,.reveal{opacity:1!important;transform:none!important;transition:none!important}
@@ -303,7 +299,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
     </div>
     <p class="bound-cap">Sampling error from \(m\) samples plus projection error from latent size \(n\); \(\kappa_n\ge n\) is the leverage of the learned features.</p>
     <div class="authors">Abulikemu Abuduweili, Yuyang Pang, Feihan Li, and Changliu Liu</div>
-    <div class="affil"><a href="https://intelligent-control-lab.github.io/" rel="noopener">Intelligent Control Lab</a> · Robotics Institute, Carnegie Mellon University</div>
+    <div class="affil">Robotics Institute, Carnegie Mellon University</div>
     <div class="buttons">
       <a class="btn primary" href="https://arxiv.org/abs/2602.19943" rel="noopener">Paper</a>
       <a class="btn ghost" href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Code</a>
@@ -759,7 +755,7 @@ html.js-reveal .reveal{transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform
 <footer>
   <div class="wrap">
     <p><b style="color:var(--ink)">Scaling Law of Neural Koopman Operators</b></p>
-    <p>Abulikemu Abuduweili, Yuyang Pang, Feihan Li, and Changliu Liu · <a href="https://intelligent-control-lab.github.io/" rel="noopener">Intelligent Control Lab</a>, Robotics Institute, Carnegie Mellon University</p>
+    <p>Abulikemu Abuduweili, Yuyang Pang, Feihan Li, and Changliu Liu · Robotics Institute, Carnegie Mellon University</p>
     <p><a href="https://github.com/intelligent-control-lab/Koopman-Scaling" rel="noopener">Code on GitHub</a> · <a href="https://arxiv.org/abs/2602.19943" rel="noopener">arXiv:2602.19943</a> · <a href="#citation">BibTeX</a></p>
   </div>
 </footer>
