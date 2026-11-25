@@ -95,7 +95,7 @@ All scripts are run from `scripts/` and write to `log/`. Sharded scripts accept 
 4. `threshold_law_fits.py`: censored-likelihood fits of the sample-threshold laws and leave-one-seed-out prediction;
 5. `plot_fixed_feature_study.py`: the three panels of Fig. 5.
 
-**Representation diagnostics (Appendix).** `measure_leverage.py` and `measure_leverage_robot.py` estimate the leverage constant and the Gram spectrum of learned features. `regularizer_diagnostics.py` (G1/Go2) and `kinova_diagnostics.py` (Kinova) report input recoverability, conditioning, and prediction loss of the four training variants. `kinova_aux_sweep.py` trains the Kinova variants.
+**Representation diagnostics (Appendix).** `leverage_diagnostics.py FEATURES.npy` reports the Gram spectrum, numerical rank, condition number, and estimated leverage of any learned feature matrix (the project page has the same tool in the browser). `measure_leverage.py` and `measure_leverage_robot.py` estimate the leverage constant and the Gram spectrum of learned features. `regularizer_diagnostics.py` (G1/Go2) and `kinova_diagnostics.py` (Kinova) report input recoverability, conditioning, and prediction loss of the four training variants. `kinova_aux_sweep.py` trains the Kinova variants.
 
 **Closed-loop control.**
 
