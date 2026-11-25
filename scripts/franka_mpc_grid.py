@@ -1,6 +1,6 @@
 """Franka MPC-setting study: one grid of linear-MPC settings, the same for every model type.
 
-Trains the models of the Franka final grid (franka_tune.py, STAGE=final settings: Baseline, +Cov, +Ctrl, +Both on
+Trains the models of the Franka final grid (franka_tune.py, STAGE=final settings: Baseline, +Cov, +Ctrl, +Aux on
 m in {1, 4, 16, 64, 140}k x n_mult in {1, 2, 4, 8, 16} x 5 seeds), then evaluates every model (and the EDMD
 baselines in data/edmd_franka/*.pt) with each MPC setting of CONFIGS on the star and figure-8 trajectories.
 Settings are selected later on the star trajectory only (analyse_franka_mpc_grid.py); figure-8 is the test.
@@ -12,8 +12,8 @@ Grid: horizon H, input weight R (on normalized inputs), and the joint-velocity r
   fd   : reference velocity from finite differences of the IK joint reference, weight Q_vel
 The original controller is H=15, R=0, (zero, Q_vel=1).
 
-MODE=bothfinal trains the selected +Both setting (BOTH_WCOV, BOTH_WCTRL, BOTH_STEPS) on the full grid.
-MODE=bothsel instead trains a wider +Both sweep for selection (m = 140k, n_mult in {1, 4, 16}, two seeds):
+MODE=bothfinal trains the selected +Aux setting (BOTH_WCOV, BOTH_WCTRL, BOTH_STEPS) on the full grid.
+MODE=bothsel instead trains a wider +Aux sweep for selection (m = 140k, n_mult in {1, 4, 16}, two seeds):
 w_cov in {0.01, 0.1, 1} x w_ctrl in {0.1, 1, 3} x train_steps in {120k, 240k}; the loss setting and the MPC
 setting are then selected jointly on the star trajectory (projects ftune_bothsel_*).
 
@@ -182,7 +182,7 @@ def evaluate(item):
 
 
 def runs():
-    if MODE == "bothfinal":     # the +Both setting selected on the star trajectory, on the full grid
+    if MODE == "bothfinal":     # the +Aux setting selected on the star trajectory, on the full grid
         c, u, st = float(os.environ["BOTH_WCOV"]), float(os.environ["BOTH_WCTRL"]), int(os.environ["BOTH_STEPS"])
         out = [dict(arm="both", steps=st, wcov=c, wctrl=u, m=m, nm=nm, seed=seed)
                for m in (1000, 4000, 16000, 64000, 140000) for nm in (1, 2, 4, 8, 16) for seed in ft.SEEDS5]

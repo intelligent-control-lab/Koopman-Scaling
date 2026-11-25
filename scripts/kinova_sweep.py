@@ -1,7 +1,7 @@
 """Kinova scaling rerun with the corrected data loader (stride-4 windows, chronological split with gaps).
 
 Grid of the paper's scaling figures: m in {1, 4, 16, 64, 140}k x encode_dim in {1, 2, 4, 8, 16} x 5 seeds = 125 runs.
-LOSS=base (no auxiliary losses; the configuration of the paper's scaling figures) or LOSS=both (+Both).
+LOSS=base (no auxiliary losses; the configuration of the paper's scaling figures) or LOSS=both (+Aux).
 Env: LOSS, SHARD, NSHARDS, NGPU, PARALLEL. Each run writes ../log/Kinova_v3<base|both>__m<m>_nm<n>_s<seed>/.
 """
 import os

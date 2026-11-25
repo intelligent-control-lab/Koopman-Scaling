@@ -1,7 +1,7 @@
 """Stage-1 selection for run_aux_tuning.sh: choose training settings by VALIDATION survival only.
 
 Reads ../log/aux_tuning_<env>/select_models.csv (training logs) and select_val_r*.csv (validation MPC
-results on reference trajectories 1000-1499). For each arm (baseline, +Both) it averages survival steps
+results on reference trajectories 1000-1499). For each arm (baseline, +Aux) it averages survival steps
 over latent sizes and seeds and picks the best setting. The MPC input weight r is a controller choice
 shared by all arms: it is picked by the mean of the two arms' best validation survival.
 Writes ../log/aux_tuning_<env>/selected.json and prints the full validation table.

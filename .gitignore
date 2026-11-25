@@ -1,8 +1,17 @@
+# data, logs, and trained models (generated locally)
 data/
 log/
+baseline_models/
 dataset.tar.gz
-control/logs
+*.pth
+*.pt
+*.npz
+!docs/assets/*.npz
+control/logs/
+
+# build artifacts
 *.pdf
 __pycache__/
 *.pyc
+.ipynb_checkpoints/
 .DS_Store

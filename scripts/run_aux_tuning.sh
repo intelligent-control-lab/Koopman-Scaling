@@ -4,11 +4,11 @@
 # Protocol (both arms get the same tuning budget; nothing is selected on the test trajectories):
 #   Stage 1 (select): m = 140k windows, n_mult in {1,4,16}, 2 seeds.
 #     baseline : train_steps in {20k, 60k}
-#     +Both    : train_steps in {20k, 60k} x ctrl_loss_weight in {0.01, 0.1, 1} x cov_loss_weight in {0.1, 1}
+#     +Aux    : train_steps in {20k, 60k} x ctrl_loss_weight in {0.01, 0.1, 1} x cov_loss_weight in {0.1, 1}
 #     every model is evaluated with MPC input weight r in {0, 1e-3} on VALIDATION reference
 #     trajectories 1000-1499, which the paper never uses.
 #     select_aux_config.py picks, per arm, the setting with the highest mean validation survival.
-#   Stage 2 (final): the selected settings for Baseline, +Cov, +Ctrl, +Both (+Cov/+Ctrl use the selected
+#   Stage 2 (final): the selected settings for Baseline, +Cov, +Ctrl, +Aux (+Cov/+Ctrl use the selected
 #     weight of their own loss), full grid m x n_mult x 5 seeds, evaluated on the paper's TEST
 #     trajectories 0-999. Report every run.
 #

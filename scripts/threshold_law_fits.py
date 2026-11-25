@@ -1,13 +1,15 @@
 """Censored-likelihood fits of empirical sample-threshold laws for the fixed-feature study (Fig. 5c, Table in Sec. 6.1.4).
 
-Data: log/fixed_feature_study_v2.csv (per draw: seed, n, kappa = estimated leverage of r = [Phi(x); u], m, dG).
+Data: log/<FFS_CSV> (default fixed_feature_study.csv, written by fixed_feature_study.py; per draw: seed, n, kappa = estimated leverage of r = [Phi(x); u], m, dG).
 m50 = number of transitions at which P(||G_tilde_{n,m} - I|| <= 1/2) = 1/2 (log-interpolated); encoders that never reach
 probability 1/2 within the largest m are right-censored at that m.
 Model: log m50 = a + f(N, kappa) + e, e ~ N(0, s^2), N = n + n_u (n_u = 1). Censored points enter with log P(e > ...).
 Laws: N, N log N, N^p, kappa log N, N log N (kappa/N)^eta.
 Reports AIC and leave-one-seed-out RMS error of log m50 (natural log) on held-out uncensored encoders; the held-out
 seed's thresholds are excluded from fitting, and its kappa comes from its features only (no regression draws).
-Primary analysis excludes the structurally rank-deficient encoder (seed 20965, n = 66; lam_min/lam_max ~ 2e-16).
+The primary analysis excludes encoders whose reference Gram matrix is singular to numerical precision
+(lambda_min / lambda_max < RANK_TOL = 1e-12), because they violate the full-rank assumption of Proposition 1.
+For CSV files without the gram_rel_lam_min column, list such encoders as EXCLUDE="n:seed,n:seed".
 
 Usage: python threshold_law_fits.py
 """
@@ -18,10 +20,14 @@ import pandas as pd
 from scipy import optimize, stats
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-d = pd.read_csv(os.path.join(HERE, "..", "log", "fixed_feature_study_v2.csv"))
+d = pd.read_csv(os.path.join(HERE, "..", "log", os.environ.get("FFS_CSV", "fixed_feature_study.csv")))
 d["good"] = d.dG <= 0.5
 MMAX = d.m.max()
-SINGULAR = {(66, 20965)}
+RANK_TOL = 1e-12
+if "gram_rel_lam_min" in d:
+    SINGULAR = {(int(n), int(s)) for (n, s), g in d.groupby(["n", "seed"]) if g.gram_rel_lam_min.iloc[0] < RANK_TOL}
+else:
+    SINGULAR = {tuple(int(v) for v in e.split(":")) for e in os.environ.get("EXCLUDE", "").split(",") if e}
 
 
 def m50(g):

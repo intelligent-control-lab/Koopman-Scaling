@@ -1,6 +1,6 @@
-"""Auxiliary-loss study on the real Kinova data (normalized): baseline, +Cov, +Ctrl, +Both with weights
-w in {0.01, 0.1, 1} (w_cov = w_ctrl for +Both), n_mult=16, m in {4000, 140000} windows, five seeds.
-ARMSET=bothext instead runs +Both with separate weights w_cov in {0.001, 0.01, 0.1} x w_ctrl in
+"""Auxiliary-loss study on the real Kinova data (normalized): baseline, +Cov, +Ctrl, +Aux with weights
+w in {0.01, 0.1, 1} (w_cov = w_ctrl for +Aux), n_mult=16, m in {4000, 140000} windows, five seeds.
+ARMSET=bothext instead runs +Aux with separate weights w_cov in {0.001, 0.01, 0.1} x w_ctrl in
 {0.001, 0.01, 0.1, 1} (pairs with w_cov = w_ctrl are in the main grid). Env: ARMSET, SHARD, NSHARDS, NGPU, PARALLEL. Each run writes ../log/Kinaux__<arm>_w<w>__m<m>_s<seed>/."""
 import os, subprocess, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))

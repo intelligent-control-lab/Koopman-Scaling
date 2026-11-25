@@ -1,7 +1,7 @@
 """Stage-1 selection for franka_tune.py: choose settings by the STAR-trajectory tracking error only.
 
 Reads ../log/franka_tuning/select_results_*.csv, averages the star error over latent sizes and seeds for every
-setting, picks the lowest per arm (baseline, +Both), and writes ../log/franka_tuning/selected.json.
+setting, picks the lowest per arm (baseline, +Aux), and writes ../log/franka_tuning/selected.json.
 """
 import glob
 import json

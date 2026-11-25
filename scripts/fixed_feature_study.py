@@ -10,6 +10,8 @@ For each (seed, n, m) and R random draws we record
   eps_samp = relative L2 distance of the one-step state prediction from the reference fit on the
              whole pool (120k transitions), i.e. the sampling error on the state coordinates
   eps_tot  = relative one-step state prediction error.
+Also recorded: gram_rel_lam_min = lambda_min / lambda_max of the reference Gram matrix of r (threshold_law_fits.py
+excludes encoders whose Gram matrix is singular to numerical precision).
 The regressor is psi = [Phi(x); u]; kappa is computed for psi with the pool Gram matrix, maximised
 over the evaluation states.
 
@@ -72,7 +74,7 @@ def main():
     rng = np.random.default_rng(0)
     with open(OUT, "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["seed", "mult", "n", "kappa", "m", "draw", "dG", "eps_samp", "eps_tot", "rank_def",
+        w.writerow(["seed", "mult", "n", "kappa", "gram_rel_lam_min", "m", "draw", "dG", "eps_samp", "eps_tot", "rank_def",
                     "mse_proj", "mse_samp", "mse_tot", "mse_cross"])
         Wref_all = np.load(REF)["windows"]                       # independent of the regression pool
         for seed in SEEDS:
@@ -88,6 +90,7 @@ def main():
                 scale = np.mean(Ex ** 2, axis=0)
                 G = Rp.T @ Rp / len(Rp)                           # reference Gram (population proxy)
                 lam, V = np.linalg.eigh(G)
+                rel_lam_min = float(lam.min() / lam.max())             # ~1e-16: structurally rank-deficient
                 Gmh = V @ np.diag(lam ** -0.5) @ V.T
                 kappa = float(np.max(np.einsum("ij,jk,ik->i", Ep, np.linalg.inv(G), Ep)))
                 M_ref = np.linalg.lstsq(Rp, Rz, rcond=None)[0]
@@ -105,7 +108,7 @@ def main():
                             pred = (Ep @ Mm)[:, :2]
                             es, et = rel_err(pred, ref_pred), rel_err(pred, Ex)
                             ms, mt = rel_mse(pred, ref_pred, scale), rel_mse(pred, Ex, scale)
-                        w.writerow([seed, mult, n, kappa, m, r, dG, es, et, int(np.linalg.matrix_rank(X) < n + 1),
+                        w.writerow([seed, mult, n, kappa, rel_lam_min, m, r, dG, es, et, int(np.linalg.matrix_rank(X) < n + 1),
                                     mse_proj, ms, mt, mt - mse_proj - ms])
                 print(f"seed={seed} n={n} kappa={kappa:.0f} ({kappa / (n + 1):.1f}(n+1)) proj={mse_proj:.2e}", flush=True)
 

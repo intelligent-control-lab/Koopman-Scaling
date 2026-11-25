@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-d = pd.read_csv(os.path.join(HERE, "..", "log", os.environ.get("FFS_CSV", "fixed_feature_study_v2.csv")))
+d = pd.read_csv(os.path.join(HERE, "..", "log", os.environ.get("FFS_CSV", "fixed_feature_study.csv")))
 d["good"] = d.dG <= 0.5
 ns = sorted(d.n.unique())
 cols = {n: plt.cm.viridis(v) for n, v in zip(ns, np.linspace(0.05, 0.9, len(ns)))}
@@ -33,8 +33,7 @@ def m50(g):
     return float(np.exp(np.interp(0.5, [pv[i - 1], pv[i]], [np.log(ms[i - 1]), np.log(ms[i])])))
 
 
-sys.path.insert(0, "/Users/abu/Documents/Code/Others/koopman/koopman_scaling_paper/tools")
-import paper_style  # noqa: E402
+import plot_style as paper_style  # noqa: E402
 rc = dict(paper_style.RC, **{"legend.fontsize": 6})
 with plt.rc_context(rc):
     fig, axs = plt.subplots(1, 3, figsize=(paper_style.FULL_W, 2.05), constrained_layout=True)

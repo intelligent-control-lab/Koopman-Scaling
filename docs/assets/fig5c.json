@@ -1,0 +1,316 @@
+{
+ "m_max": 8000.0,
+ "fit_full": {
+  "nlogn": [
+   2.194283581181911,
+   -1.068931172602915
+  ],
+  "leverage": [
+   1.1250614717582528,
+   -1.759662567793638,
+   0.4191083362574958
+  ]
+ },
+ "encoders": [
+  {
+   "n": 4,
+   "N": 5,
+   "seed": 17382,
+   "kappa": 39.0,
+   "m50": 60.2,
+   "status": "reached",
+   "pred_nlogn": 72.3,
+   "pred_leverage": 58.0
+  },
+  {
+   "n": 4,
+   "N": 5,
+   "seed": 20965,
+   "kappa": 32.5,
+   "m50": 66.2,
+   "status": "reached",
+   "pred_nlogn": 73.2,
+   "pred_leverage": 54.2
+  },
+  {
+   "n": 4,
+   "N": 5,
+   "seed": 51194,
+   "kappa": 57.5,
+   "m50": 71.3,
+   "status": "reached",
+   "pred_nlogn": 72.0,
+   "pred_leverage": 69.9
+  },
+  {
+   "n": 4,
+   "N": 5,
+   "seed": 76849,
+   "kappa": 38.9,
+   "m50": 46.7,
+   "status": "reached",
+   "pred_nlogn": 70.6,
+   "pred_leverage": 62.0
+  },
+  {
+   "n": 4,
+   "N": 5,
+   "seed": 84902,
+   "kappa": 84.4,
+   "m50": 70.8,
+   "status": "reached",
+   "pred_nlogn": 73.2,
+   "pred_leverage": 81.6
+  },
+  {
+   "n": 6,
+   "N": 7,
+   "seed": 17382,
+   "kappa": 34.2,
+   "m50": 86.8,
+   "status": "reached",
+   "pred_nlogn": 122.3,
+   "pred_leverage": 80.7
+  },
+  {
+   "n": 6,
+   "N": 7,
+   "seed": 20965,
+   "kappa": 89.0,
+   "m50": 106.8,
+   "status": "reached",
+   "pred_nlogn": 124.0,
+   "pred_leverage": 121.6
+  },
+  {
+   "n": 6,
+   "N": 7,
+   "seed": 51194,
+   "kappa": 60.8,
+   "m50": 107.7,
+   "status": "reached",
+   "pred_nlogn": 121.8,
+   "pred_leverage": 102.8
+  },
+  {
+   "n": 6,
+   "N": 7,
+   "seed": 76849,
+   "kappa": 34.1,
+   "m50": 80.0,
+   "status": "reached",
+   "pred_nlogn": 119.4,
+   "pred_leverage": 92.2
+  },
+  {
+   "n": 6,
+   "N": 7,
+   "seed": 84902,
+   "kappa": 47.8,
+   "m50": 100.8,
+   "status": "reached",
+   "pred_nlogn": 123.9,
+   "pred_leverage": 93.4
+  },
+  {
+   "n": 10,
+   "N": 11,
+   "seed": 17382,
+   "kappa": 143.0,
+   "m50": 187.3,
+   "status": "reached",
+   "pred_nlogn": 236.9,
+   "pred_leverage": 235.0
+  },
+  {
+   "n": 10,
+   "N": 11,
+   "seed": 20965,
+   "kappa": 95.2,
+   "m50": 189.0,
+   "status": "reached",
+   "pred_nlogn": 240.1,
+   "pred_leverage": 200.3
+  },
+  {
+   "n": 10,
+   "N": 11,
+   "seed": 51194,
+   "kappa": 98.1,
+   "m50": 218.8,
+   "status": "reached",
+   "pred_nlogn": 235.9,
+   "pred_leverage": 201.8
+  },
+  {
+   "n": 10,
+   "N": 11,
+   "seed": 76849,
+   "kappa": 64.7,
+   "m50": 174.5,
+   "status": "reached",
+   "pred_nlogn": 231.3,
+   "pred_leverage": 188.1
+  },
+  {
+   "n": 10,
+   "N": 11,
+   "seed": 84902,
+   "kappa": 89.4,
+   "m50": 205.3,
+   "status": "reached",
+   "pred_nlogn": 239.9,
+   "pred_leverage": 195.1
+  },
+  {
+   "n": 18,
+   "N": 19,
+   "seed": 17382,
+   "kappa": 291.9,
+   "m50": 566.3,
+   "status": "reached",
+   "pred_nlogn": 502.4,
+   "pred_leverage": 534.3
+  },
+  {
+   "n": 18,
+   "N": 19,
+   "seed": 20965,
+   "kappa": 143.6,
+   "m50": 377.4,
+   "status": "reached",
+   "pred_nlogn": 509.2,
+   "pred_leverage": 401.3
+  },
+  {
+   "n": 18,
+   "N": 19,
+   "seed": 51194,
+   "kappa": 199.6,
+   "m50": 459.4,
+   "status": "reached",
+   "pred_nlogn": 500.4,
+   "pred_leverage": 464.5
+  },
+  {
+   "n": 18,
+   "N": 19,
+   "seed": 76849,
+   "kappa": 226.5,
+   "m50": 427.1,
+   "status": "reached",
+   "pred_nlogn": 490.5,
+   "pred_leverage": 486.3
+  },
+  {
+   "n": 18,
+   "N": 19,
+   "seed": 84902,
+   "kappa": 243.4,
+   "m50": 468.5,
+   "status": "reached",
+   "pred_nlogn": 508.7,
+   "pred_leverage": 503.4
+  },
+  {
+   "n": 34,
+   "N": 35,
+   "seed": 17382,
+   "kappa": 665.4,
+   "m50": 1595.9,
+   "status": "reached",
+   "pred_nlogn": 1117.4,
+   "pred_leverage": 1299.0
+  },
+  {
+   "n": 34,
+   "N": 35,
+   "seed": 20965,
+   "kappa": 912.0,
+   "m50": 1666.8,
+   "status": "reached",
+   "pred_nlogn": 1132.6,
+   "pred_leverage": 1501.6
+  },
+  {
+   "n": 34,
+   "N": 35,
+   "seed": 51194,
+   "kappa": 957.6,
+   "m50": 1539.9,
+   "status": "reached",
+   "pred_nlogn": 1113.0,
+   "pred_leverage": 1669.3
+  },
+  {
+   "n": 34,
+   "N": 35,
+   "seed": 76849,
+   "kappa": 1889.5,
+   "m50": 2073.1,
+   "status": "reached",
+   "pred_nlogn": 1091.1,
+   "pred_leverage": 1652.0
+  },
+  {
+   "n": 34,
+   "N": 35,
+   "seed": 84902,
+   "kappa": 323.0,
+   "m50": 1024.4,
+   "status": "reached",
+   "pred_nlogn": 1131.6,
+   "pred_leverage": 972.0
+  },
+  {
+   "n": 66,
+   "N": 67,
+   "seed": 17382,
+   "kappa": 984.6,
+   "m50": 3319.9,
+   "status": "reached",
+   "pred_nlogn": 2529.8,
+   "pred_leverage": 2641.2
+  },
+  {
+   "n": 66,
+   "N": 67,
+   "seed": 20965,
+   "kappa": null,
+   "m50": null,
+   "status": "rank-deficient",
+   "pred_nlogn": null,
+   "pred_leverage": null
+  },
+  {
+   "n": 66,
+   "N": 67,
+   "seed": 51194,
+   "kappa": 3850.5,
+   "m50": 2734.7,
+   "status": "reached",
+   "pred_nlogn": 2519.7,
+   "pred_leverage": 5481.3
+  },
+  {
+   "n": 66,
+   "N": 67,
+   "seed": 76849,
+   "kappa": 5036.6,
+   "m50": null,
+   "status": "not reached",
+   "pred_nlogn": 2470.1,
+   "pred_leverage": 4103.8
+  },
+  {
+   "n": 66,
+   "N": 67,
+   "seed": 84902,
+   "kappa": 1594.5,
+   "m50": 3161.2,
+   "status": "reached",
+   "pred_nlogn": 2561.8,
+   "pred_leverage": 3312.9
+  }
+ ]
+}

@@ -1,4 +1,4 @@
-"""Diagnostics of the four training variants (baseline, +Cov, +Ctrl, +Both) of the tuned G1/Go2 study, at n_mult=16:
+"""Diagnostics of the four training variants (baseline, +Cov, +Ctrl, +Aux) of the tuned G1/Go2 study, at n_mult=16:
 normalized leverage kappa_hat/n, Gram condition number, held-out input-reconstruction error of the inverse-control map
 u_hat = (B^T B)^+ B^T (z+ - A z), test prediction loss, and tracking survival.
 Usage: python regularizer_diagnostics.py ENV DATASET RUNS_GLOB FINAL_DIR OUT.csv"""

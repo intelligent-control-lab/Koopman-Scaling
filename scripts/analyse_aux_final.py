@@ -20,12 +20,12 @@ tests = pd.concat([pd.read_csv(f) for f in sorted(glob.glob(os.path.join(src, "f
 if "failed" in tests:
     print("failed evaluations:", int(tests.failed.fillna(0).sum()))
     tests = tests[tests.failed.fillna(0) != 1]
-SUFFIX = {"base": "Baseline", "cov": "+Cov", "ctrl": "+Ctrl", "both": "+Both"}   # aux_final_<ENV>_<arm>
+SUFFIX = {"base": "Baseline", "cov": "+Cov", "ctrl": "+Ctrl", "both": "+Aux"}   # aux_final_<ENV>_<arm>
 d = tests.merge(models[["model_path", "project", "train_samples", "encode_dim_param", "encode_dim", "seed"]],
                 on="model_path")
 d["arm"] = d.project.str.rsplit("_", n=1).str[-1].map(SUFFIX)
 print(f"{len(d)} evaluated models;", d.groupby("arm").size().to_dict())
-ARMS = ["Baseline", "+Cov", "+Ctrl", "+Both"]
+ARMS = ["Baseline", "+Cov", "+Ctrl", "+Aux"]
 
 cell = d.groupby(["arm", "train_samples", "encode_dim"]).mean_survival_steps.mean().reset_index()
 left = cell.groupby(["arm", "train_samples"]).mean_survival_steps.mean().unstack(0)[ARMS]
@@ -42,12 +42,11 @@ big = d[d.train_samples == d.train_samples.max()]
 seedmean = big.groupby(["arm", "seed"]).mean_survival_steps.mean().unstack(0)[ARMS]
 print(f"\nm={int(d.train_samples.max())}: mean over latent sizes, per seed:\n", seedmean.round(2).to_string())
 print("  mean +- std over seeds:", {a: f"{seedmean[a].mean():.1f} +- {seedmean[a].std(ddof=1):.1f}" for a in ARMS})
-diff = seedmean["+Both"] - seedmean["Baseline"]
-print(f"  +Both - Baseline per seed: {diff.round(2).tolist()}  (positive in {(diff > 0).sum()}/{len(diff)} seeds)")
+diff = seedmean["+Aux"] - seedmean["Baseline"]
+print(f"  +Aux - Baseline per seed: {diff.round(2).tolist()}  (positive in {(diff > 0).sum()}/{len(diff)} seeds)")
 
 try:
-    sys.path.insert(0, "/Users/abu/Documents/Code/Others/koopman/koopman_scaling_paper/tools")
-    import paper_style
+    import plot_style as paper_style
     env = d.project.iloc[0].split("_")[2].lower()
     n_x = {"g1": 53, "go2": 35}[env]   # latent dimension n = n_x + n_enc
     paper_style.control_panels(left, right, n_x, "Survival steps", os.path.join(out, f"{env}_control_tuned.pdf"))

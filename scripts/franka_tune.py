@@ -2,9 +2,9 @@
 
 Protocol (same structure as the G1/Go2 study; nothing is selected on the reported metric):
   select: m = 140k, n_mult in {1, 4, 16}, seeds {17382, 76849}.
-          baseline: train_steps in {60k, 120k};  +Both: train_steps x w_ctrl in {0.01, 0.1, 1} x w_cov in {0.1, 1}.
+          baseline: train_steps in {60k, 120k};  +Aux: train_steps x w_ctrl in {0.01, 0.1, 1} x w_cov in {0.1, 1}.
           Settings are chosen by the STAR-trajectory tracking error (lower is better).
-  final:  selected settings for Baseline, +Cov, +Ctrl, +Both on m in {1, 4, 16, 64, 140}k x n_mult in {1, 2, 4, 8, 16}
+  final:  selected settings for Baseline, +Cov, +Ctrl, +Aux on m in {1, 4, 16, 64, 140}k x n_mult in {1, 2, 4, 8, 16}
           x 5 seeds; the reported metric is the FIGURE-8 tracking error (the paper's metric).
 Every arm is evaluated with the same MPC settings (franka_mpc.FrankaMPCConfig with warmup 50, as for the paper's
 Koopman Franka results).
